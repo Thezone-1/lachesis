@@ -12,10 +12,31 @@ type Config struct {
 	PollSeconds int               `json:"poll_seconds"`
 	IdleSeconds int               `json:"idle_seconds"`
 	Allotments  map[string]string `json:"allotments"` // app -> duration ("2h", "90m")
+	Rules       []Rule            `json:"rules"`      // classification rules, title rules before app rules
+	Repos       []string          `json:"repos"`      // git repos scanned for commit yield
+	Weights     Weights           `json:"weights"`    // score component weights, must sum to 100
+}
+
+// Weights are the score components; each component is a 0–1 ratio.
+type Weights struct {
+	Focus    int `json:"focus"`    // productive / active
+	Depth    int `json:"depth"`    // deep-work / productive
+	Cohesion int `json:"cohesion"` // 1 - switches-per-hour penalty
+	Yield    int `json:"yield"`    // artifact-linked deep hours / deep hours
+}
+
+func defaultWeights() Weights {
+	return Weights{Focus: 35, Depth: 25, Cohesion: 15, Yield: 25}
 }
 
 func defaultConfig() Config {
-	return Config{PollSeconds: 5, IdleSeconds: 60, Allotments: map[string]string{}}
+	return Config{
+		PollSeconds: 5,
+		IdleSeconds: 60,
+		Allotments:  map[string]string{},
+		Rules:       defaultRules(),
+		Weights:     defaultWeights(),
+	}
 }
 
 func baseDir() string {
@@ -41,6 +62,12 @@ func loadConfig() Config {
 	}
 	if cfg.Allotments == nil {
 		cfg.Allotments = map[string]string{}
+	}
+	if cfg.Rules == nil {
+		cfg.Rules = defaultRules()
+	}
+	if cfg.Weights == (Weights{}) {
+		cfg.Weights = defaultWeights()
 	}
 	return cfg
 }

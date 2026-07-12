@@ -7,15 +7,18 @@ import (
 	"time"
 )
 
-const version = "0.1.0"
+const version = "0.2.0"
 
 const usage = `lacheisis %s — measures each thread and decides how much is allotted
 
 Usage:
   lacheisis track                    run the collector (foreground; use Start-Process to detach)
-  lacheisis report [YYYY-MM-DD]      show the day's thread per app (default: today)
+  lacheisis report [YYYY-MM-DD]      day's score, focus blocks, yield and per-app thread (default: today)
   lacheisis allot <app> <duration>   set a daily allotment, e.g. lacheisis allot chrome 2h
   lacheisis allot                    list allotments
+  lacheisis classify <app|title> <pattern> <category>
+                                     add a rule (category: productive|neutral|distracting)
+  lacheisis classify                 list rules
 
 Data: %s
 `
@@ -39,6 +42,8 @@ func main() {
 		err = printReport(day, cfg)
 	case "allot":
 		err = allot(cfg, os.Args[2:])
+	case "classify":
+		err = classify(cfg, os.Args[2:])
 	case "version", "--version":
 		fmt.Println("lacheisis", version)
 	default:

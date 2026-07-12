@@ -1,45 +1,48 @@
 # Lacheisis — Knowledge Graph
 
-Updated: 2026-07-12 (evening)
+Updated: 2026-07-12 (v0.2 shipped)
 
 ## What it is
 Windows productivity tracker CLI in Go (stdlib only, no deps). Lachesis measures the
 thread (time per app), Atropos flags what exceeds its allotment. Core stance:
 productivity is **yield** (outcomes per focused hour), never volume — volume
-metrics get farmed (Goodhart). See `planning/v0.2-yield.md` for the full argument.
+metrics get farmed (Goodhart). Full argument in `planning/v0.2-yield.md`.
 
 ## Status
-- v0.1.0 MVP built and dogfooding on Somoprovo's machine since 2026-07-12
-- Tracker runs as a detached hidden process: `Start-Process lacheisis.exe track -WindowStyle Hidden`
-  (does NOT survive reboot yet — restart manually)
-- Demo allotment set: `code` → 6h/day
-
-## ➡ NEXT SESSION: build v0.2 per `planning/v0.2-yield.md`
-Four layers, in order: (1) category rules engine `categories.go` + `classify`
-command, (2) focus-block sessionizer `blocks.go` (deep-work ≥25min, switch
-rate, title entropy), (3) `gityield.go` commit-to-block attribution from
-configured repos, (4) ratio-based daily score 0–100 + report v2. Anti-gaming:
-score only ratios/outcomes, flag low-entropy "farmer" blocks. Test fixtures:
-farmer vs deep worker must diverge. All computable from existing JSONL — no
-schema change.
+- v0.2.0 built 2026-07-12: yield-based scoring live, all 4 layers from the plan
+- Dogfooding: tracker running as detached hidden process on this machine
+  (`Start-Process lacheisis.exe track -WindowStyle Hidden`; does NOT survive
+  reboot — restart manually)
+- Config now includes `rules` (defaults ship in code), `repos`
+  (lacheisis, ccyield, trainpulse, somoprovo portfolio), `weights`
+- First real-day score: 13/100 (fragmented day, no deep blocks yet — honest)
+- 7 unit tests pass incl. farmer-vs-deep-worker divergence acceptance test
 
 ## Architecture (flat `package main`)
 | File | Role |
 |------|------|
-| `main.go` | CLI dispatch: `track`, `report [day]`, `allot <app> <dur>`, `version` |
-| `win.go` | Win32 via `syscall.NewLazyDLL`: GetForegroundWindow → pid → QueryFullProcessImageNameW for app name; GetLastInputInfo for idle |
-| `store.go` | Append-only JSONL per local day: `%LOCALAPPDATA%\lacheisis\data\YYYY-MM-DD.jsonl`, one `Sample{ts,app,title,idle}` per poll |
-| `config.go` | `%LOCALAPPDATA%\lacheisis\config.json`: poll_seconds (5), idle_seconds (60), allotments map app→duration |
-| `report.go` | Aggregates samples (each = poll_seconds of attention) per app, bar chart, allotment % + "✂ Atropos" overrun lines |
+| `main.go` | CLI dispatch: `track`, `report [day]`, `allot`, `classify`, `version` |
+| `win.go` | Win32 via `syscall.NewLazyDLL`: foreground window → app name; GetLastInputInfo for idle |
+| `store.go` | Append-only JSONL per local day: `%LOCALAPPDATA%\lacheisis\data\YYYY-MM-DD.jsonl` |
+| `config.go` | config.json: poll/idle seconds, allotments, rules, repos, score weights |
+| `categories.go` | Rule engine: title rules before app rules, first match wins, unmatched→neutral; `classify` cmd |
+| `blocks.go` | Sessionizer: segments split at idle/gaps (>3 ticks+jitter), same-app runs, ≤2-sample glances absorbed; Block entropy = unique titles/samples; deep = ≥25min productive |
+| `gityield.go` | Read-only `git log --since/--until` per configured repo; commit → containing deep block, else nearest ended ≤30min before; yieldRatio = linked deep time / deep time |
+| `score.go` | Score 0–100: focus 35 + depth 25 + cohesion 15 + yield 25 (weights in config); verdict line; farmer warnings (entropy < 0.05) |
+| `report.go` | Report v2: score header, category split, per-app bars w/ [+]/[·]/[!] tags, deep-block timeline w/ commits, orphan commits, Atropos cuts, warnings |
+| `v2_test.go` | Rule precedence, glance/gap/idle boundaries, entropy, attribution, farmer-vs-deep, score bounds |
 
 ## Design decisions
-- **JSONL over SQLite** for v0.1 — zero deps, torn lines skipped on read; revisit if querying grows
-- App key = lowercased exe basename without `.exe` (e.g. `chrome`, `code`)
-- Locked screen / secure desktop / idle ≥60s → sample counted as idle
-- Titles are stored per sample (drill-down exists in data, not yet in report UI)
+- **Never score volume** — every score component is a ratio; commit counts shown but not scored
+- Block category = majority vote of its samples' categories (chrome-on-youtube blocks classify by title)
+- Glance time counts toward block duration but not titles; glances still count as switches (fragmentation stays honest)
+- Empty day scores 0 (cohesion isn't free when nothing was measured)
+- App key = lowercased exe basename; JSONL over SQLite still (no schema change needed for v0.2)
+- Test fixtures built in code (time-controlled), not testdata files — deviation from plan, simpler
 
-## Later (v0.3+ candidates, deliberately out of v0.2)
-- Live Atropos alert (toast/beep) from the tracker when allotment crossed, not just in report
-- Weekly report + trends; `lacheisis top` for current-day live view
+## Later (v0.3+ candidates)
+- Live Atropos alert (toast/beep) from tracker when allotment crossed
+- Weekly report + trends; `lacheisis top` live view
 - Auto-start on login (Task Scheduler); single-instance lock
-- Claude/token usage ingestion via ccyield data (same yield-not-spend framing)
+- Metronome-uniform switching detection (second farmer signature — only entropy implemented)
+- Claude/token usage ingestion via [[ccyield]] data (same yield-not-spend framing)
