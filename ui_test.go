@@ -82,26 +82,53 @@ func TestHideTitlesAndWarmup(t *testing.T) {
 
 func TestCutAnimationStages(t *testing.T) {
 	const w = 40
-	walking := buildScene(w, 0, Productive, false, 5, false).thread[threadRow]
-	if !strings.ContainsRune(walking, '✂') {
-		t.Fatal("scissors should be on the thread while walking")
+	start := w - scW
+	rest := buildScene(w, 0, Productive, false, -1, false, true)
+	if !strings.Contains(strings.Join(rest.thread[:], "\n"), "X") {
+		t.Fatal("Atropos must always hold visible scissors")
 	}
-	cut := buildScene(w, 0, Productive, false, 24, false)
-	if strings.Contains(cut.thread[threadRow][w/2+4:], "o") {
+	shut := buildScene(w, 0, Productive, false, -1, false, false)
+	if shut.thread == rest.thread {
+		t.Fatal("scissors should snip between open and shut")
+	}
+	walking := buildScene(w, 0, Productive, false, 6, false, true)
+	if strings.Index(walking.thread[threadRow], "X") >= start {
+		t.Fatal("scissors should have left their resting place")
+	}
+	cut := buildScene(w, 0, Productive, false, 24, false, true)
+	mid := start / 2
+	if strings.TrimSpace(cut.thread[threadRow][mid+scW:]) != "" {
 		t.Fatal("thread right of the cut should be gone")
 	}
-	if !strings.Contains(strings.Join(cut.thread[:], ""), "~~~~~") {
+	if !strings.Contains(strings.Join(cut.thread[threadRow+1:], ""), "~~") {
 		t.Fatal("the severed tail should be drawn below the thread")
 	}
 	for f := 0; f < cutFrames; f++ {
-		s := buildScene(w, 3, Neutral, false, f, true)
+		s := buildScene(w, 3, Neutral, false, f, true, f%2 == 0)
 		for _, row := range s.thread {
 			if len([]rune(row)) != w {
 				t.Fatalf("frame %d: row width %d", f, len([]rune(row)))
 			}
 		}
 	}
-	if buildScene(w, 0, Productive, false, -1, false).thread[threadRow] != threadLine(w, 0, Productive, false, false, false) {
-		t.Fatal("no cut: thread must be untouched")
+}
+
+func TestYarnSpins(t *testing.T) {
+	seen := map[string]bool{}
+	for p := 0; p < 4; p++ {
+		f := yarnFrame(p)
+		for _, row := range f {
+			if len([]rune(row)) != yarnW {
+				t.Fatalf("phase %d: yarn row width %d", p, len([]rune(row)))
+			}
+		}
+		seen[strings.Join(f[:], "\n")] = true
+	}
+	if len(seen) != 4 {
+		t.Fatalf("yarn should look different in each of 4 phases, got %d", len(seen))
+	}
+	first := yarnFrame(0)
+	if !strings.Contains(strings.Join(first[:], ""), "~~") {
+		t.Fatal("a strand should lead from the yarn to the wheel")
 	}
 }

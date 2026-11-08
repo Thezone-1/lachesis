@@ -39,18 +39,65 @@ var figure = [sceneH]string{
 // sceneParts are the drawn rows of the wheel, the thread area and the figure.
 // They are kept apart so each can be coloured on its own.
 type sceneParts struct {
+	yarn   [sceneH]string
 	wheel  [sceneH]string
 	thread [sceneH]string
 	figure [sceneH]string
 }
 
-// buildScene composes the wheel, the thread and Atropos. cutFrame < 0 means no
-// cut is happening; otherwise it is the animation frame (0..cutFrames-1).
-func buildScene(threadW, pos int, cat Category, idle bool, cutFrame int, ascii bool) sceneParts {
+const (
+	scW      = 7
+	yarnBall = 7
+	yarnW    = yarnBall + 2 // the ball plus the strand that leads to the wheel
+)
+
+// yarnFrame draws the ball of yarn. The crossing strands swap every phase and a
+// bright mark travels round the rim, so it reads as rolling.
+func yarnFrame(phase int) [sceneH]string {
+	var rows [sceneH][]rune
+	base := [2][sceneH]string{
+		{` .---. `, `/ \|/ \`, `|--+--|`, `\ /|\ /`, ` '---' `},
+		{` .---. `, `/ /|\ \`, `|--X--|`, `\ \|/ /`, ` '---' `},
+	}[phase%2]
+	for i, r := range base {
+		rows[i] = []rune(r)
+	}
+	mark := [4][2]int{{0, 3}, {2, 6}, {4, 3}, {2, 0}}[phase%4]
+	rows[mark[0]][mark[1]] = '@'
+	var out [sceneH]string
+	for i := range rows {
+		strand := "  "
+		if i == threadRow {
+			strand = "~~"
+		}
+		out[i] = string(rows[i]) + strand
+	}
+	return out
+}
+
+var scissorsOpen = [3]string{
+	` \ .-. `,
+	`  X   )`,
+	` / '-' `,
+}
+
+var scissorsShut = [3]string{
+	`   .-. `,
+	`==X   )`,
+	`   '-' `,
+}
+
+// buildScene composes the wheel, the thread, the scissors and Atropos.
+// cutFrame < 0 means no cut is happening; otherwise it is the animation frame
+// (0..cutFrames-1). While waiting, the scissors sit at the end of the thread
+// and snip open and shut (openIdle).
+func buildScene(threadW, pos int, cat Category, idle bool, cutFrame int, ascii, openIdle bool) sceneParts {
 	var p sceneParts
 	p.wheel = wheelFrames[(pos/2)%2]
+	p.yarn = yarnFrame(pos / 2)
 	if idle {
 		p.wheel = wheelFrames[0]
+		p.yarn = yarnFrame(0)
 	}
 	p.figure = figure
 
@@ -58,57 +105,64 @@ func buildScene(threadW, pos int, cat Category, idle bool, cutFrame int, ascii b
 	for i := range rows {
 		rows[i] = []rune(strings.Repeat(" ", threadW))
 	}
-	copy(rows[threadRow], []rune(threadLine(threadW, pos, cat, idle, false, ascii)))
+	thread := []rune(threadLine(threadW, pos, cat, idle, false, ascii))
+	start := threadW - scW
+	mid := start / 2
 
-	if cutFrame >= 0 && threadW > 16 {
-		mid := threadW / 2
-		start := threadW - cutFromEnd
-		open, closed := "✂", "✂"
-		if ascii {
-			open, closed = "8<", "8-"
+	// drawThread fills the thread row over [from, to).
+	drawThread := func(from, to int) {
+		for i := from; i < to && i < threadW; i++ {
+			if i >= 0 {
+				rows[threadRow][i] = thread[i]
+			}
 		}
-		x, sym := start, open
-		switch {
-		case cutFrame < 12: // walk the scissors left along the thread
-			x = start - (start-mid)*cutFrame/12
-		case cutFrame < 20: // snip, snip
-			x = mid
-			if (cutFrame/2)%2 == 1 {
-				sym = closed
-			}
-		case cutFrame < 28: // thread is cut; the tail falls
-			x, sym = mid, closed
-			for i := mid + 1; i < threadW; i++ {
-				rows[threadRow][i] = ' '
-			}
-			fall := (cutFrame - 20) / 3
-			if fall > 2 {
-				fall = 2
-			}
-			tail := []rune(strings.Repeat(" ", threadW))
-			for i := mid + 1; i < threadW && i < mid+10; i++ {
-				tail[i] = '~'
-			}
-			if threadRow+1+fall < sceneH {
-				copy(rows[threadRow+1+fall][mid+1:], tail[mid+1:])
-			}
-		default: // scissors withdraw; the thread is re-spun from the wheel
-			back := (cutFrame - 28) * (start - mid) / 16
-			x, sym = mid+back, open
-			if x > start {
-				x = start
-			}
-			for i := mid + 1; i < threadW; i++ {
-				if i < x {
-					rows[threadRow][i] = ' '
+	}
+	put := func(x int, sprite [3]string) {
+		for r, line := range sprite {
+			for c, ch := range []rune(line) {
+				if x+c >= 0 && x+c < threadW && ch != ' ' {
+					rows[threadRow-1+r][x+c] = ch
+				} else if x+c >= 0 && x+c < threadW && r != 1 {
+					rows[threadRow-1+r][x+c] = ' '
 				}
 			}
 		}
-		for i, r := range []rune(sym) {
-			if x+i >= 0 && x+i < threadW {
-				rows[threadRow][x+i] = r
-			}
+	}
+
+	switch {
+	case cutFrame < 0 || threadW < 18:
+		drawThread(0, start)
+		if idle || !openIdle {
+			put(start, scissorsShut)
+		} else {
+			put(start, scissorsOpen)
 		}
+	case cutFrame < 12: // walk the scissors left along the thread
+		x := start - (start-mid)*cutFrame/12
+		drawThread(0, threadW)
+		put(x, scissorsOpen)
+	case cutFrame < 20: // snip, snip
+		drawThread(0, mid)
+		sprite := scissorsOpen
+		if (cutFrame/2)%2 == 1 {
+			sprite = scissorsShut
+		}
+		drawThread(mid+scW, threadW)
+		put(mid, sprite)
+	case cutFrame < 28: // cut: the tail falls
+		drawThread(0, mid)
+		tailRow := threadRow + 1 + (cutFrame-20)/4
+		if tailRow >= sceneH {
+			tailRow = sceneH - 1
+		}
+		for i := mid + scW; i < threadW; i++ {
+			rows[tailRow][i] = thread[i]
+		}
+		put(mid, scissorsShut)
+	default: // scissors withdraw, the new thread follows them from the wheel
+		x := mid + (start-mid)*(cutFrame-28)/(cutFrames-28)
+		drawThread(0, x)
+		put(x, scissorsOpen)
 	}
 	for i := range rows {
 		p.thread[i] = string(rows[i])

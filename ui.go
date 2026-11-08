@@ -36,7 +36,7 @@ type live struct {
 // minScoreActive is how much activity a day needs before a score means anything.
 const minScoreActive = 5 * time.Minute
 
-const threadPattern = "~~~~~o~~~~~~~o~~~~~~"
+const threadPattern = "~~~-~~~~~-~~~-~~~~-~~"
 
 // threadStep says whether the thread advances on this frame: fast when
 // productive, slow when neutral, stuttering when distracted, frozen when away.
@@ -142,7 +142,7 @@ func renderLive(l live, frame, pos int, o uiOpts) []string {
 	if o.width < 20 {
 		o.width = 20
 	}
-	tw := o.width - wheelW - figureW - 2
+	tw := o.width - yarnW - wheelW - figureW - 2
 	if tw < 18 {
 		tw = 18
 	}
@@ -150,7 +150,7 @@ func renderLive(l live, frame, pos int, o uiOpts) []string {
 	if l.cutting {
 		cf = l.cutFrame
 	}
-	sc := buildScene(tw, pos, l.cat, l.idle, cf, o.ascii)
+	sc := buildScene(tw, pos, l.cat, l.idle, cf, o.ascii, (frame/4)%2 == 0)
 	tint := catColor(l.cat, l.idle)
 
 	app := l.sample.App
@@ -181,10 +181,10 @@ func renderLive(l live, frame, pos int, o uiOpts) []string {
 	lines := []string{
 		"  " + paint(o, "1", "L A C H E S I S") + "  " + paint(o, "90", "version "+version) + "   " +
 			paint(o, "32", beat+" tracking") + paint(o, "90", fmt.Sprintf(" · %d %s · last %s", l.samples, plural(l.samples, "sample", "samples"), ago)),
-		"  " + paint(o, "90", "Lachesis measures"+strings.Repeat(" ", max(1, wheelW+tw-17-2))+"Atropos cuts"),
+		"  " + paint(o, "90", strings.Repeat(" ", yarnW)+"Lachesis measures"+strings.Repeat(" ", max(1, wheelW+tw-17-2))+"Atropos cuts"),
 	}
 	for i := 0; i < sceneH; i++ {
-		lines = append(lines, "  "+paint(o, tint, sc.wheel[i])+paint(o, tint, sc.thread[i])+paint(o, "35", sc.figure[i]))
+		lines = append(lines, "  "+paint(o, "36", sc.yarn[i])+paint(o, tint, sc.wheel[i])+paint(o, tint, sc.thread[i])+paint(o, "35", sc.figure[i]))
 	}
 	lines = append(lines,
 		fmt.Sprintf("  now    %s  %s", paint(o, tint, catTag(l.cat)+" "+state), now),
