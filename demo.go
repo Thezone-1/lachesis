@@ -31,11 +31,11 @@ func demo(args []string) error {
 		cut    bool
 	}
 	script := []act{
-		{"spinning: you are on task", 40, Productive, false, false},
-		{"slowing: a neutral app", 32, Neutral, false, false},
-		{"fraying: a distraction", 40, Distracting, false, false},
+		{"running: you are on task", 110, Productive, false, false},
+		{"jogging: a neutral app", 50, Neutral, false, false},
+		{"stumbling: a distraction", 90, Distracting, false, false},
 		{"Atropos arrives", cutFrames + 4, Productive, false, true},
-		{"away: the wheel rests", 32, Neutral, true, false},
+		{"away: the yarn rests", 30, Neutral, true, false},
 	}
 	total := 0
 	for _, a := range script {
@@ -47,10 +47,10 @@ func demo(args []string) error {
 	view := newLiveView(os.Stdout)
 	defer view.close()
 
-	start := time.Now()
 	ticker := time.NewTicker(125 * time.Millisecond)
 	defer ticker.Stop()
-	pos, frame := 0, 0
+	run := newRunner()
+	frame := 0
 	for {
 		select {
 		case <-stop:
@@ -67,26 +67,24 @@ func demo(args []string) error {
 				}
 				t -= a.frames
 			}
-			if threadStep(frame, cur.cat, cur.idle) {
-				pos++
+			if cur.cut && local == 0 {
+				run.startCut("chrome")
 			}
-			samples := frame/40 + 1
+			run.step(frame, opts.width, cur.cat, cur.idle)
 			l := live{
-				sample:   Sample{App: "demo", Title: cur.name},
-				cat:      cur.cat,
-				idle:     cur.idle,
-				m:        DayMetrics{Active: 3*time.Hour + 42*time.Minute, Idle: 25 * time.Minute},
-				score:    Score{Focus: 0.72, Depth: 0.61, Cohesion: 0.88, Yield: 0.67, Total: 74},
-				block:    80 * time.Minute,
-				cutting:  cur.cut && local < cutFrames,
-				cutFrame: local,
-				cutApp:   "chrome",
-				samples:  samples,
-				last:     time.Now().Add(-time.Duration(frame%40) * 125 * time.Millisecond),
-				now:      time.Now(),
+				sample:  Sample{App: "demo", Title: cur.name},
+				cat:     cur.cat,
+				idle:    cur.idle,
+				m:       DayMetrics{Active: 3*time.Hour + 42*time.Minute, Idle: 25 * time.Minute},
+				score:   Score{Focus: 0.72, Depth: 0.61, Cohesion: 0.88, Yield: 0.67, Total: 74},
+				block:   80 * time.Minute,
+				hi:      74,
+				deep:    31 + frame/40,
+				samples: frame/40 + 1,
+				last:    time.Now().Add(-time.Duration(frame%40) * 125 * time.Millisecond),
+				now:     time.Now(),
 			}
-			_ = start
-			view.draw(renderLive(l, frame, pos, opts))
+			view.draw(renderLive(l, frame, run, opts))
 		}
 	}
 }

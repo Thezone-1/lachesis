@@ -16,79 +16,23 @@ type uiOpts struct {
 
 // live is everything the view needs to draw one frame.
 type live struct {
-	sample Sample
-	cat    Category
-	m      DayMetrics
-	score  Score
-	cut    string // app that blew its allotment, if any
-	idle   bool
-	block  time.Duration // length of the current focus block
-
-	cutting  bool // true while the scissors animation plays
-	cutFrame int
-	cutApp   string
-	samples  int
-	last     time.Time
-	now      time.Time
-	warn     string // set when the window cannot be read (e.g. a permission is missing)
+	sample  Sample
+	cat     Category
+	m       DayMetrics
+	score   Score
+	cut     string // app that blew its allotment, if any
+	idle    bool
+	block   time.Duration // length of the current focus block
+	hi      int           // best deep-work minutes on any earlier day
+	deep    int           // deep-work minutes today
+	samples int
+	last    time.Time
+	now     time.Time
+	warn    string // set when the window cannot be read (e.g. a permission is missing)
 }
 
 // minScoreActive is how much activity a day needs before a score means anything.
 const minScoreActive = 5 * time.Minute
-
-const threadPattern = "~~~-~~~~~-~~~-~~~~-~~"
-
-// threadStep says whether the thread advances on this frame: fast when
-// productive, slow when neutral, stuttering when distracted, frozen when away.
-func threadStep(frame int, cat Category, idle bool) bool {
-	switch {
-	case idle:
-		return false
-	case cat == Productive:
-		return true
-	case cat == Distracting:
-		return frame%2 == 0
-	default:
-		return frame%3 == 0
-	}
-}
-
-// threadLine draws the scrolling thread. A distracted thread frays, and an
-// exceeded allotment cuts it with scissors.
-func threadLine(w, pos int, cat Category, idle, cut, ascii bool) string {
-	b := []rune(strings.Repeat(" ", w))
-	for i := range b {
-		c := rune(threadPattern[(i+pos)%len(threadPattern)])
-		if idle {
-			c = '.'
-		} else if cat == Distracting && (i+pos)%5 == 0 {
-			c = ','
-		}
-		b[i] = c
-	}
-	if cut && w > 12 {
-		mid := w / 2
-		scissors := '✂'
-		if ascii {
-			scissors = 'x'
-		}
-		b[mid] = scissors
-		for i := mid + 1; i < mid+4 && i < w; i++ {
-			b[i] = ' '
-		}
-	}
-	return string(b)
-}
-
-func yarn(frame int, ascii, idle bool) string {
-	if ascii {
-		return string("|/-\\"[(frame/2)%4])
-	}
-	if idle {
-		return "◌"
-	}
-	return string([]rune("◐◓◑◒")[(frame/2)%4])
-}
 
 func scoreBar(total int, ascii bool) string {
 	filled := total / 10
@@ -138,19 +82,11 @@ func catColor(c Category, idle bool) string {
 }
 
 // renderLive returns the frame as lines, without a trailing newline.
-func renderLive(l live, frame, pos int, o uiOpts) []string {
-	if o.width < 20 {
-		o.width = 20
+func renderLive(l live, frame int, r *runner, o uiOpts) []string {
+	if o.width < minWidth {
+		o.width = minWidth
 	}
-	tw := o.width - yarnW - wheelW - figureW - 2
-	if tw < 18 {
-		tw = 18
-	}
-	cf := -1
-	if l.cutting {
-		cf = l.cutFrame
-	}
-	sc := buildScene(tw, pos, l.cat, l.idle, cf, o.ascii, (frame/4)%2 == 0)
+	scene := r.draw(o.width, l.cat, l.idle)
 	tint := catColor(l.cat, l.idle)
 
 	app := l.sample.App
@@ -167,6 +103,24 @@ func renderLive(l live, frame, pos int, o uiOpts) []string {
 	}
 	now := trunc(strings.TrimSpace(fmt.Sprintf("%s %s", app, title)), o.width-14)
 
+	hi := l.hi
+	if l.deep > hi {
+		hi = l.deep
+	}
+	scores := fmt.Sprintf("HI %05d  %05d", hi, l.deep)
+	title0 := "L A C H E S I S"
+	pad := max(2, o.width-len(title0)-len(scores))
+	lines := []string{
+		"  " + paint(o, "1", title0) + strings.Repeat(" ", pad) + paint(o, "90", scores),
+	}
+	for i := 0; i < sceneRows; i++ {
+		colour := "90"
+		if i == groundRow {
+			colour = tint
+		}
+		lines = append(lines, "  "+paint(o, colour, scene[i]))
+	}
+
 	beat := "●"
 	if o.ascii {
 		beat = "*"
@@ -178,32 +132,21 @@ func renderLive(l live, frame, pos int, o uiOpts) []string {
 	if !l.last.IsZero() && !l.now.IsZero() {
 		ago = fmt.Sprintf("%ds ago", int(l.now.Sub(l.last).Seconds()))
 	}
-	lines := []string{
-		"  " + paint(o, "1", "L A C H E S I S") + "  " + paint(o, "90", "version "+version) + "   " +
-			paint(o, "32", beat+" tracking") + paint(o, "90", fmt.Sprintf(" · %d %s · last %s", l.samples, plural(l.samples, "sample", "samples"), ago)),
-		"  " + paint(o, "90", strings.Repeat(" ", yarnW)+"Lachesis measures"+strings.Repeat(" ", max(1, wheelW+tw-17-2))+"Atropos cuts"),
-	}
-	for i := 0; i < sceneH; i++ {
-		lines = append(lines, "  "+paint(o, "36", sc.yarn[i])+paint(o, tint, sc.wheel[i])+paint(o, tint, sc.thread[i])+paint(o, "35", sc.figure[i]))
-	}
 	lines = append(lines,
+		"  "+paint(o, "32", beat+" tracking")+paint(o, "90", fmt.Sprintf(" · %d %s · last %s", l.samples, plural(l.samples, "sample", "samples"), ago)),
 		fmt.Sprintf("  now    %s  %s", paint(o, tint, catTag(l.cat)+" "+state), now),
 		fmt.Sprintf("  today  %s active · %s idle · focus block %s", liveDur(l.m.Active), liveDur(l.m.Idle), liveDur(l.block)),
 	)
 	if l.m.Active < minScoreActive {
-		lines = append(lines,
-			fmt.Sprintf("  score  %s --  warming up the thread (needs %s of activity)", scoreBar(0, o.ascii), fmtDur(minScoreActive)),
-			"")
+		lines = append(lines, fmt.Sprintf("  score  %s --  warming up the thread (needs %s of activity)", scoreBar(0, o.ascii), fmtDur(minScoreActive)))
 	} else {
-		lines = append(lines,
-			fmt.Sprintf("  score  %s %d  %s", paint(o, tint, scoreBar(l.score.Total, o.ascii)), l.score.Total, verdict(l.score.Total)),
-			fmt.Sprintf("         focus %.2f · depth %.2f · cohesion %.2f · yield %.2f", l.score.Focus, l.score.Depth, l.score.Cohesion, l.score.Yield))
+		lines = append(lines, fmt.Sprintf("  score  %s %d  %s", paint(o, tint, scoreBar(l.score.Total, o.ascii)), l.score.Total, verdict(l.score.Total)))
 	}
 	switch {
 	case l.warn != "":
 		lines = append(lines, "  "+paint(o, "33", "! "+l.warn))
-	case l.cutting:
-		lines = append(lines, "  "+paint(o, "31", "✂ "+cutLabel(l.cutFrame, l.cutApp)))
+	case r.cutting() && r.cutF >= 14:
+		lines = append(lines, "  "+paint(o, "31", "✂ "+banter(r.cutApp, l.m.Active)))
 	case l.cut != "":
 		lines = append(lines, "  "+paint(o, "31", "✂ Atropos: "+l.cut+" is over its allotment"))
 	default:

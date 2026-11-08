@@ -6,52 +6,116 @@ import (
 	"time"
 )
 
-func TestThreadStep(t *testing.T) {
-	if threadStep(1, Productive, true) {
-		t.Fatal("idle must freeze the thread")
+const testWidth = 56
+
+func simulate(r *runner, frames int, cat Category, idle bool) (bumps int) {
+	for f := 1; f <= frames; f++ {
+		before := r.bump
+		r.step(f, testWidth, cat, idle)
+		if r.bump > before {
+			bumps++
+		}
 	}
-	if !threadStep(1, Productive, false) {
-		t.Fatal("productive thread advances every frame")
-	}
-	if threadStep(1, Neutral, false) || !threadStep(3, Neutral, false) {
-		t.Fatal("neutral thread advances every third frame")
+	return bumps
+}
+
+func TestAwayFreezesTheWorld(t *testing.T) {
+	r := newRunner()
+	simulate(r, 200, Productive, false)
+	scroll := r.scroll
+	simulate(r, 200, Productive, true)
+	if r.scroll != scroll {
+		t.Fatal("the world must not move while you are away")
 	}
 }
 
-func TestThreadLineWidthAndCut(t *testing.T) {
-	for _, cat := range []Category{Productive, Neutral, Distracting} {
-		for _, cut := range []bool{false, true} {
-			got := []rune(threadLine(40, 7, cat, false, cut, false))
-			if len(got) != 40 {
-				t.Fatalf("%s cut=%v width %d", cat, cut, len(got))
-			}
-			if cut && !strings.ContainsRune(string(got), '✂') {
-				t.Fatal("cut thread must show scissors")
+func TestFocusedBallClearsEveryObstacle(t *testing.T) {
+	r := newRunner()
+	if n := simulate(r, 3000, Productive, false); n != 0 {
+		t.Fatalf("a productive ball bumped %d times", n)
+	}
+	if r.scroll < 2000 {
+		t.Fatal("productive runs should keep moving")
+	}
+}
+
+func TestNeutralBallClearsObstaclesToo(t *testing.T) {
+	r := newRunner()
+	if n := simulate(r, 3000, Neutral, false); n != 0 {
+		t.Fatalf("a neutral ball bumped %d times", n)
+	}
+}
+
+func TestDistractedBallStumbles(t *testing.T) {
+	r := newRunner()
+	if n := simulate(r, 3000, Distracting, false); n == 0 {
+		t.Fatal("a distracted ball should hit obstacles")
+	}
+}
+
+func TestScissorsScene(t *testing.T) {
+	r := newRunner()
+	r.startCut("chrome")
+	for f := 1; f < 30; f++ {
+		r.step(f, testWidth, Productive, false)
+	}
+	scene := r.draw(testWidth, Productive, false)
+	all := strings.Join(scene[:], "\n")
+	if !strings.Contains(all, "G A M E   O V E R") {
+		t.Fatal("game over banner should show once the snipping starts")
+	}
+	if !strings.Contains(all, " o o ") || !strings.Contains(all, "|") {
+		t.Fatal("scissors should be on screen")
+	}
+	if strings.TrimSpace(scene[groundRow][cutX+3:]) != "" {
+		t.Fatal("the thread beyond the cut should be gone")
+	}
+	for f := 30; f <= cutFrames+2; f++ {
+		r.step(f, testWidth, Productive, false)
+	}
+	if r.cutting() || len(r.obs) != 0 {
+		t.Fatal("the scene should reset after the cut")
+	}
+	after := r.draw(testWidth, Productive, false)
+	if strings.Contains(strings.Join(after[:], ""), "G A M E") {
+		t.Fatal("the banner should be gone after the reset")
+	}
+}
+
+func TestRowsAreAlwaysTheRightWidth(t *testing.T) {
+	r := newRunner()
+	r.startCut("x")
+	for f := 1; f < 600; f++ {
+		cat := []Category{Productive, Neutral, Distracting}[(f/40)%3]
+		r.step(f, testWidth, cat, f%97 == 0)
+		for _, row := range r.draw(testWidth, cat, false) {
+			if n := len([]rune(row)); n != testWidth {
+				t.Fatalf("frame %d: row is %d wide, want %d", f, n, testWidth)
 			}
 		}
 	}
 }
 
-func TestRenderLiveASCIIHasNoWideGlyphs(t *testing.T) {
-	l := live{sample: Sample{App: "code", Title: "main.go"}, cat: Productive,
-		score: Score{Total: 74}, block: 80 * time.Minute, cut: "slack"}
-	lines := renderLive(l, 5, 3, uiOpts{ascii: true, width: 50})
-	for _, line := range lines {
-		for _, r := range line {
-			if r > 127 && r != '·' && r != '✂' && r != '…' {
-				t.Fatalf("non-ASCII glyph %q in ascii mode: %s", r, line)
-			}
-		}
+func TestRenderLiveShowsHeartbeatAndHidesTitles(t *testing.T) {
+	l := live{sample: Sample{App: "chrome", Title: "secret tab"}, cat: Neutral, samples: 1,
+		last: time.Now(), now: time.Now(), hi: 74, deep: 31}
+	lines := renderLive(l, 1, newRunner(), uiOpts{width: testWidth, hideTitles: true, ascii: true})
+	all := strings.Join(lines, "\n")
+	if strings.Contains(all, "secret tab") {
+		t.Fatal("window title leaked with hideTitles")
 	}
-	if !strings.Contains(strings.Join(lines, "\n"), "main.go") {
-		t.Fatal("current window title should be shown")
+	for _, want := range []string{"HI 00074", "00031", "tracking", "1 sample", "warming up"} {
+		if !strings.Contains(all, want) {
+			t.Fatalf("missing %q in:\n%s", want, all)
+		}
 	}
 }
 
-func TestRenderLiveZeroStateDoesNotPanic(t *testing.T) {
-	lines := renderLive(live{idle: true}, 0, 0, uiOpts{width: 10})
-	if len(lines) == 0 {
-		t.Fatal("expected a frame")
+func TestWarningReplacesOtherMessages(t *testing.T) {
+	l := live{warn: "cannot read the front window", cut: "chrome"}
+	all := strings.Join(renderLive(l, 1, newRunner(), uiOpts{width: testWidth}), "\n")
+	if !strings.Contains(all, "cannot read the front window") || strings.Contains(all, "over its allotment") {
+		t.Fatal("a permission warning must take priority")
 	}
 }
 
@@ -64,71 +128,10 @@ func TestScoreBar(t *testing.T) {
 	}
 }
 
-func TestHideTitlesAndWarmup(t *testing.T) {
-	l := live{sample: Sample{App: "chrome", Title: "secret tab"}, cat: Neutral}
-	all := strings.Join(renderLive(l, 1, 1, uiOpts{width: 50, hideTitles: true}), "\n")
-	if strings.Contains(all, "secret tab") {
-		t.Fatal("window title leaked with hideTitles")
-	}
-	if !strings.Contains(all, "warming up") {
-		t.Fatal("score must say warming up before enough activity")
-	}
-	l.m.Active = 10 * time.Minute
-	l.score.Total = 60
-	if strings.Contains(strings.Join(renderLive(l, 1, 1, uiOpts{width: 50}), "\n"), "warming up") {
-		t.Fatal("score should show once there is enough activity")
-	}
-}
-
-func TestCutAnimationStages(t *testing.T) {
-	const w = 40
-	start := w - scW
-	rest := buildScene(w, 0, Productive, false, -1, false, true)
-	if !strings.Contains(strings.Join(rest.thread[:], "\n"), "X") {
-		t.Fatal("Atropos must always hold visible scissors")
-	}
-	shut := buildScene(w, 0, Productive, false, -1, false, false)
-	if shut.thread == rest.thread {
-		t.Fatal("scissors should snip between open and shut")
-	}
-	walking := buildScene(w, 0, Productive, false, 6, false, true)
-	if strings.Index(walking.thread[threadRow], "X") >= start {
-		t.Fatal("scissors should have left their resting place")
-	}
-	cut := buildScene(w, 0, Productive, false, 24, false, true)
-	mid := start / 2
-	if strings.TrimSpace(cut.thread[threadRow][mid+scW:]) != "" {
-		t.Fatal("thread right of the cut should be gone")
-	}
-	if !strings.Contains(strings.Join(cut.thread[threadRow+1:], ""), "~~") {
-		t.Fatal("the severed tail should be drawn below the thread")
-	}
-	for f := 0; f < cutFrames; f++ {
-		s := buildScene(w, 3, Neutral, false, f, true, f%2 == 0)
-		for _, row := range s.thread {
-			if len([]rune(row)) != w {
-				t.Fatalf("frame %d: row width %d", f, len([]rune(row)))
-			}
+func TestBanterNamesTheApp(t *testing.T) {
+	for _, app := range []string{"a", "bb", "ccc"} {
+		if !strings.Contains(banter(app, 31*time.Minute), app) {
+			t.Fatalf("banter should name %q", app)
 		}
-	}
-}
-
-func TestYarnSpins(t *testing.T) {
-	seen := map[string]bool{}
-	for p := 0; p < 4; p++ {
-		f := yarnFrame(p)
-		for _, row := range f {
-			if len([]rune(row)) != yarnW {
-				t.Fatalf("phase %d: yarn row width %d", p, len([]rune(row)))
-			}
-		}
-		seen[strings.Join(f[:], "\n")] = true
-	}
-	if len(seen) != 4 {
-		t.Fatalf("yarn should look different in each of 4 phases, got %d", len(seen))
-	}
-	first := yarnFrame(0)
-	if !strings.Contains(strings.Join(first[:], ""), "~~") {
-		t.Fatal("a strand should lead from the yarn to the wheel")
 	}
 }

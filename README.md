@@ -64,26 +64,28 @@ Add the repos whose commits should count toward yield in `config.json`
 
 ### The live view
 
-On a terminal, `lachesis track` draws a small live view: a yarn ball spins at the left of a
-scrolling thread. The thread runs fast while you work on something productive, slows when
-you are neutral, frays when you are distracted, and freezes when you step away. If an app
-goes over its daily allotment, Atropos cuts the thread (✂). Under it you see the current
-app, today's active time, your focus block and a live score.
+On a terminal, `lachesis track` shows a tiny runner game. A ball of yarn rolls along the thread:
+the thread is solid behind it (already spun) and dashed ahead (still to spin).
 
 ```
-  L A C H E S I S  version 0.3.0
-  ╭────────────────────────────────────────────────────────────╮
-  │ ◑ ~~~~~o~~~~~~~o~~~~~~~~~o~~~~~~~o~~~~~~~~o~~~~~~~o~~~~~~~ │
-  ╰────────────────────────────────────────────────────────────╯
-  now    [+] productive  code main.go
-  today  3h42m active · 25m idle · focus block 1h20m
-  score  ███████░░░ 74  a well-measured day
-         focus 0.72 · depth 0.61 · cohesion 0.88 · yield 0.67
+  L A C H E S I S                          HI 00074  00031
+                                                          
+                                                          
+            (&)                                           
+                  [!]                           [!]       
+  ~~~~~~~~~~--  --  --  --  --  --  --  --  --  --  --  --
 ```
 
-- It only animates on a real terminal. In the background, in a pipe or with `--plain`, it prints one line and stays quiet.
-- `--hide-titles` hides window titles, which is useful when you record a demo or share your screen.
-- `LACHESIS_ASCII=1` uses plain ASCII glyphs, and `NO_COLOR=1` turns colors off.
+- **Focused or neutral:** the yarn runs (fast or at a jog) and jumps each `[!]` distraction.
+- **Distracted:** it can't see the obstacle in time, so it bumps `(x)` and slows down.
+- **Away:** the yarn rests and the world stops.
+- **Over an allotment:** Atropos' scissors drop and snip the thread. `G A M E   O V E R`.
+- The numbers in the corner are the Dino-style high score: `HI` is your best day of deep-work minutes, and the second number is today's.
+
+It only animates on a real terminal. In the background, in a pipe or with `--plain`, it prints one
+line and stays quiet. `--hide-titles` hides window titles for recordings, `LACHESIS_ASCII=1` uses
+plain glyphs and `NO_COLOR=1` turns colors off. `lachesis demo` plays the whole story without
+tracking anything, which is a good way to take a first look.
 
 ### Example report
 

@@ -114,8 +114,12 @@ func track(cfg Config, args []string) error {
 	}
 
 	state := live{}
-	pos, frame := 0, 0
-	cutAnim, cutApp := -1, ""
+	frame := 0
+	run := newRunner()
+	hi := 0
+	if animate {
+		hi = bestDeepMinutes(cfg, today)
+	}
 	fired := map[string]bool{}
 	var lastErr string
 	var lastTS time.Time
@@ -142,9 +146,10 @@ func track(cfg Config, args []string) error {
 		lastTS = now
 		if animate {
 			state = buildLive(samples, s, cfg)
+			state.hi = hi
 			if state.cut != "" && !fired[state.cut] {
 				fired[state.cut] = true
-				cutAnim, cutApp = 0, state.cut
+				run.startCut(state.cut)
 			}
 		}
 	}
@@ -170,19 +175,10 @@ func track(cfg Config, args []string) error {
 			sampleNow(now)
 		case <-frames:
 			frame++
-			if threadStep(frame, state.cat, state.idle) {
-				pos++
-			}
-			if cutAnim >= 0 {
-				cutAnim++
-				if cutAnim >= cutFrames {
-					cutAnim = -1
-				}
-			}
+			run.step(frame, opts.width, state.cat, state.idle)
 			shown := state
-			shown.cutting, shown.cutFrame, shown.cutApp = cutAnim >= 0, cutAnim, cutApp
 			shown.samples, shown.last, shown.now, shown.warn = len(samples), lastTS, time.Now(), lastErr
-			view.draw(renderLive(shown, frame, pos, opts))
+			view.draw(renderLive(shown, frame, run, opts))
 		}
 	}
 }
@@ -190,7 +186,8 @@ func track(cfg Config, args []string) error {
 // buildLive derives the view state from today's samples.
 func buildLive(samples []Sample, last Sample, cfg Config) live {
 	m := sessionize(samples, cfg.PollSeconds, cfg.Rules)
-	l := live{sample: last, idle: last.Idle || last.App == "", m: m, score: computeScore(m, cfg.Weights)}
+	l := live{sample: last, idle: last.Idle || last.App == "", m: m, score: computeScore(m, cfg.Weights),
+		deep: int(m.DeepTotal.Minutes())}
 	if !l.idle {
 		l.cat = classifySample(last, cfg.Rules)
 	}
