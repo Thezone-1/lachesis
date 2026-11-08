@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 )
@@ -45,12 +44,13 @@ func sessionRecap(start, end time.Time, label string, cfg Config, o uiOpts) []st
 		}
 	}
 
+	p := o.p()
 	title := "session complete"
 	if label != "" {
 		title += fmt.Sprintf(" · %q", label)
 	}
 	type row struct{ plain, painted string }
-	rows := []row{{"✦ " + title, paint(o, "1;38;5;227", "✦ "+title)}}
+	rows := []row{{"✦ " + title, paint(o, p.celebrate, "✦ "+title)}}
 	add := func(s string) { rows = append(rows, row{s, s}) }
 
 	add(fmt.Sprintf("%s on the clock · %s active", liveDur(end.Sub(start)), liveDur(m.Active)))
@@ -67,7 +67,7 @@ func sessionRecap(start, end time.Time, label string, cfg Config, o uiOpts) []st
 			add(fmt.Sprintf("%d commit%s linked to deep work", commits, map[bool]string{true: "", false: "s"}[commits == 1]))
 		}
 		plain := fmt.Sprintf("score %s %d  %s", scoreBar(score.Total, o.ascii), score.Total, verdict(score.Total))
-		rows = append(rows, row{plain, fmt.Sprintf("%s %s %s  %s", paint(o, "38;5;244", "score"), coloredBar(o, score.Total), paint(o, "1", fmt.Sprint(score.Total)), verdict(score.Total))})
+		rows = append(rows, row{plain, fmt.Sprintf("%s %s %s  %s", paint(o, p.label, "score"), coloredBar(o, score.Total), paint(o, p.bold, fmt.Sprint(score.Total)), verdict(score.Total))})
 	}
 
 	h, v, tl, tr, bl, br := "─", "│", "╭", "╮", "╰", "╯"
@@ -75,17 +75,17 @@ func sessionRecap(start, end time.Time, label string, cfg Config, o uiOpts) []st
 		h, v, tl, tr, bl, br = "-", "|", "+", "+", "+", "+"
 	}
 	edge := strings.Repeat(h, recapWidth+2)
-	lines := []string{"  " + paint(o, "38;5;220", tl+edge+tr)}
+	lines := []string{"  " + paint(o, p.box, tl+edge+tr)}
 	for _, r := range rows {
 		pad := max(0, recapWidth-len([]rune(r.plain)))
-		lines = append(lines, "  "+paint(o, "38;5;220", v)+" "+r.painted+strings.Repeat(" ", pad)+" "+paint(o, "38;5;220", v))
+		lines = append(lines, "  "+paint(o, p.box, v)+" "+r.painted+strings.Repeat(" ", pad)+" "+paint(o, p.box, v))
 	}
-	lines = append(lines, "  "+paint(o, "38;5;220", bl+edge+br))
+	lines = append(lines, "  "+paint(o, p.box, bl+edge+br))
 	return lines
 }
 
 func printRecap(start, end time.Time, label string, cfg Config) {
-	o := uiOpts{ascii: os.Getenv("LACHESIS_ASCII") != "", color: isTerminal(os.Stdout) && os.Getenv("NO_COLOR") == ""}
+	o := termOpts(cfg)
 	fmt.Println()
 	for _, l := range sessionRecap(start, end, label, cfg, o) {
 		fmt.Println(l)

@@ -12,6 +12,7 @@ type uiOpts struct {
 	color      bool
 	width      int  // total width of the thread strip's inside, in cells
 	hideTitles bool // for screen recordings: show the app, never the window title
+	pal        *palette
 }
 
 // live is everything the view needs to draw one frame.
@@ -75,7 +76,7 @@ func paintRow(o uiOpts, c canvas, y int, tint string) string {
 			j++
 		}
 		seg := string(row[i:j])
-		if code := styleCode(st[i], tint); code != "" {
+		if code := styleCode(o.p(), st[i], tint); code != "" {
 			seg = paint(o, code, seg)
 		}
 		b.WriteString(seg)
@@ -84,35 +85,32 @@ func paintRow(o uiOpts, c canvas, y int, tint string) string {
 	return b.String()
 }
 
-func styleCode(st uint8, tint string) string {
+func styleCode(p palette, st uint8, tint string) string {
 	switch st {
 	case stThread:
-		return "38;5;220" // golden thread
+		return p.thread
 	case stDash:
-		return "38;5;240"
+		return p.dash
 	case stBall:
 		return tint
 	case stObstacle:
-		return "1;38;5;196"
+		return p.obstacle
 	case stScissors:
-		return "1;38;5;231"
+		return p.scissors
 	case stBanner:
-		return "1;38;5;196"
+		return p.banner
 	case stSpark1:
-		return "1;38;5;227"
+		return p.spark[0]
 	case stSpark2:
-		return "1;38;5;213"
+		return p.spark[1]
 	case stSpark3:
-		return "1;38;5;51"
+		return p.spark[2]
 	}
 	return ""
 }
 
-var titleGradient = []int{213, 177, 141, 105, 69, 33, 39, 45}
-var barGradient = []int{196, 202, 208, 214, 220, 226, 190, 154, 118, 82}
-
 // gradientText colours each character of s along the palette.
-func gradientText(o uiOpts, s string, palette []int) string {
+func gradientText(o uiOpts, s string, pal []int) string {
 	if !o.color {
 		return s
 	}
@@ -123,7 +121,7 @@ func gradientText(o uiOpts, s string, palette []int) string {
 			b.WriteRune(ch)
 			continue
 		}
-		b.WriteString(paint(o, fmt.Sprintf("1;38;5;%d", palette[n%len(palette)]), string(ch)))
+		b.WriteString(paint(o, fmt.Sprintf("1;38;5;%d", pal[n%len(pal)]), string(ch)))
 		n++
 	}
 	return b.String()
@@ -142,9 +140,9 @@ func coloredBar(o uiOpts, total int) string {
 	var b strings.Builder
 	for i := 0; i < 10; i++ {
 		if i < filled {
-			b.WriteString(paint(o, fmt.Sprintf("38;5;%d", barGradient[i]), on))
+			b.WriteString(paint(o, fmt.Sprintf("38;5;%d", o.p().bar[i]), on))
 		} else {
-			b.WriteString(paint(o, "38;5;238", off))
+			b.WriteString(paint(o, o.p().barOff, off))
 		}
 	}
 	return b.String()
@@ -157,16 +155,16 @@ func paint(o uiOpts, code, s string) string {
 	return "\x1b[" + code + "m" + s + "\x1b[0m"
 }
 
-func catColor(c Category, idle bool) string {
+func catColor(p palette, c Category, idle bool) string {
 	switch {
 	case idle:
-		return "38;5;244"
+		return p.ballIdle
 	case c == Productive:
-		return "1;38;5;82"
+		return p.ballProductive
 	case c == Distracting:
-		return "1;38;5;203"
+		return p.ballDistracting
 	default:
-		return "1;38;5;214"
+		return p.ballNeutral
 	}
 }
 
@@ -176,7 +174,8 @@ func renderLive(l live, frame int, r *runner, o uiOpts) []string {
 		o.width = minWidth
 	}
 	scene := r.drawCanvas(o.width, l.idle)
-	tint := catColor(l.cat, l.idle)
+	pal := o.p()
+	tint := catColor(pal, l.cat, l.idle)
 
 	app := l.sample.App
 	state := "away"
@@ -200,8 +199,8 @@ func renderLive(l live, frame int, r *runner, o uiOpts) []string {
 	title0 := "L A C H E S I S"
 	pad := max(2, o.width-len(title0)-len(hiText)-2-len(todayText))
 	lines := []string{
-		"  " + gradientText(o, title0, titleGradient) + strings.Repeat(" ", pad) +
-			paint(o, "38;5;220", hiText) + "  " + paint(o, "1;38;5;231", todayText),
+		"  " + gradientText(o, title0, pal.title) + strings.Repeat(" ", pad) +
+			paint(o, pal.hi, hiText) + "  " + paint(o, pal.today, todayText),
 	}
 	for i := 0; i < sceneRows; i++ {
 		lines = append(lines, "  "+paintRow(o, scene, i, tint))
@@ -219,28 +218,28 @@ func renderLive(l live, frame int, r *runner, o uiOpts) []string {
 		ago = fmt.Sprintf("%ds ago", int(l.now.Sub(l.last).Seconds()))
 	}
 	lines = append(lines,
-		"  "+paint(o, "1;38;5;82", beat+" tracking")+paint(o, "90", sessionLabel(l)+fmt.Sprintf(" · %d %s · last %s", l.samples, plural(l.samples, "sample", "samples"), ago)),
+		"  "+paint(o, pal.beat, beat+" tracking")+paint(o, pal.dim, sessionLabel(l)+fmt.Sprintf(" · %d %s · last %s", l.samples, plural(l.samples, "sample", "samples"), ago)),
 		fmt.Sprintf("  now    %s  %s", paint(o, tint, catTag(l.cat)+" "+state), now),
 		fmt.Sprintf("  today  %s active · %s idle · focus block %s", liveDur(l.m.Active), liveDur(l.m.Idle), liveDur(l.block)),
 	)
 	if l.m.Active < minScoreActive {
 		lines = append(lines, fmt.Sprintf("  score  %s --  warming up the thread (needs %s of activity)", scoreBar(0, o.ascii), fmtDur(minScoreActive)))
 	} else {
-		lines = append(lines, fmt.Sprintf("  %s  %s %s  %s", paint(o, "38;5;244", "score"), coloredBar(o, l.score.Total), paint(o, "1", fmt.Sprint(l.score.Total)), verdict(l.score.Total)))
+		lines = append(lines, fmt.Sprintf("  %s  %s %s  %s", paint(o, pal.label, "score"), coloredBar(o, l.score.Total), paint(o, pal.bold, fmt.Sprint(l.score.Total)), verdict(l.score.Total)))
 	}
 	switch {
 	case l.warn != "":
-		lines = append(lines, "  "+paint(o, "33", "! "+l.warn))
+		lines = append(lines, "  "+paint(o, pal.warn, "! "+l.warn))
 	case r.cutting() && r.cutF >= 14:
-		lines = append(lines, "  "+paint(o, "31", "✂ "+banter(r.cutApp, l.m.Active)))
+		lines = append(lines, "  "+paint(o, pal.cut, "✂ "+banter(r.cutApp, l.m.Active)))
 	case r.celebrating():
-		lines = append(lines, "  "+paint(o, "1;38;5;227", "✦ deep work: a 25-minute block of unbroken thread"))
+		lines = append(lines, "  "+paint(o, pal.celebrate, "✦ deep work: a 25-minute block of unbroken thread"))
 	case l.cut != "":
-		lines = append(lines, "  "+paint(o, "31", "✂ Atropos: "+l.cut+" is over its allotment"))
+		lines = append(lines, "  "+paint(o, pal.cut, "✂ Atropos: "+l.cut+" is over its allotment"))
 	default:
 		lines = append(lines, "")
 	}
-	lines = append(lines, "  "+paint(o, "90", "Ctrl-C pauses the thread"))
+	lines = append(lines, "  "+paint(o, pal.dim, "Ctrl-C pauses the thread"))
 	return lines
 }
 

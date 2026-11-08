@@ -15,7 +15,8 @@ type check struct {
 
 // doctorCmd checks that Lachesis can do its job here and says how to fix what it cannot.
 func doctorCmd(args []string) error {
-	o := uiOpts{color: isTerminal(os.Stdout) && os.Getenv("NO_COLOR") == ""}
+	o := termOpts(loadConfig())
+	p := o.p()
 
 	var checks []check
 	dirErr := os.MkdirAll(baseDir(), 0o700)
@@ -34,11 +35,11 @@ func doctorCmd(args []string) error {
 	fmt.Println()
 	for _, c := range checks {
 		if c.ok {
-			fmt.Println("  " + paint(o, "1;38;5;82", "✓") + " " + c.name)
+			fmt.Println("  " + paint(o, p.ok, "✓") + " " + c.name)
 		} else {
 			bad++
-			fmt.Println("  " + paint(o, "1;38;5;203", "✗") + " " + c.name)
-			fmt.Println("    " + paint(o, "38;5;214", c.hint))
+			fmt.Println("  " + paint(o, p.bad, "✗") + " " + c.name)
+			fmt.Println("    " + paint(o, p.hint, c.hint))
 		}
 	}
 	fmt.Println()

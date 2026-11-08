@@ -185,8 +185,8 @@ func startCmd(args []string) error {
 
 	for i := 0; i < 40; i++ {
 		if cur, ok := runningSession(); ok && cur.PID == pid {
-			o := uiOpts{color: isTerminal(os.Stdout) && os.Getenv("NO_COLOR") == ""}
-			fmt.Printf("%s Lachesis is spinning the thread (pid %d). End the session with `lachesis stop`.\n", paint(o, "1;38;5;82", "●"), pid)
+			o := termOpts(loadConfig())
+			fmt.Printf("%s Lachesis is spinning the thread (pid %d). End the session with `lachesis stop`.\n", paint(o, o.p().ok, "●"), pid)
 			if note := titleNote(); note != "" {
 				fmt.Println("  note: " + note)
 			}

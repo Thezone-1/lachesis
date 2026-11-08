@@ -18,6 +18,7 @@ func demo(args []string) error {
 		ascii: os.Getenv("LACHESIS_ASCII") != "",
 		color: os.Getenv("NO_COLOR") == "",
 		width: termWidth() - 8,
+		pal:   paletteFor(loadConfig()),
 	}
 	if opts.width > 56 {
 		opts.width = 56

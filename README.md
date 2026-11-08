@@ -3,7 +3,7 @@
 > Lachesis measures each thread and decides how much is allotted. Atropos cuts it.
 
 A local-first focus tracker for developers, with a tiny game in your terminal. A ball of yarn runs
-along a golden thread while you work, jumps your distractions, and gets snipped by Atropos when you
+along a thread while you work, jumps your distractions, and gets snipped by Atropos when you
 go over an allotment. When a session ends you get a recap card.
 
 It scores your day by **yield** (outcomes per focused hour), not by how long a window stayed open.
@@ -124,8 +124,10 @@ blocks the next start.
 
 ## The live view
 
-`lachesis track` shows a runner game. The yarn rolls along the thread, which is solid gold behind it
-(already spun) and dashed ahead (still to spin).
+`lachesis track` shows a runner game. The yarn rolls along the thread, which is solid behind it
+(already spun) and dashed ahead (still to spin). The default look is monochrome: greys and white, with
+meaning carried by brightness. A focused ball is bright, a neutral one is mid-grey, a distracted one is
+dim, and an away one is darkest.
 
 - **Focused or neutral:** it runs (fast, or at a jog) and jumps each `[!]` distraction.
 - **Distracted:** it cannot see the obstacle in time, so it bumps `(x)` and slows down.
@@ -136,7 +138,12 @@ blocks the next start.
 
 It only animates on a real terminal. In the background, in a pipe or with `--plain` it prints one line
 and stays quiet. `--hide-titles` keeps window titles off the screen for recordings,
-`LACHESIS_ASCII=1` uses plain glyphs and `NO_COLOR=1` turns color off.
+`LACHESIS_ASCII=1` uses plain glyphs and `NO_COLOR=1` turns all styling off.
+
+### Themes
+
+The default is monochrome. If you want color, set `"theme": "color"` in `config.json`, or run with
+`LACHESIS_THEME=color`. The environment variable wins over the config.
 
 ## How the score works
 
@@ -168,6 +175,7 @@ The 0-100 score is built only from ratios and outcomes:
 | `rules` | classification rules | built-in set |
 | `repos` | git repos scanned for commit yield | none |
 | `weights` | score weights (focus, depth, cohesion, yield; sum to 100) | 35/25/15/25 |
+| `theme` | `mono` or `color` | `mono` |
 
 ## Privacy
 
@@ -203,8 +211,8 @@ further. Data grows by about 1.7 MB a day at the default settings. Windows and L
 - **"window titles are off".** macOS Accessibility is not allowed for your terminal. Run `lachesis doctor --open`.
 - **`lachesis start` says it did not start.** Read `lachesis.log` in the data folder.
 - **"already tracking".** A session is running. `lachesis status` shows it, `lachesis stop` ends it.
-- **Colors look flat.** Use a terminal with 256-color support (Terminal.app, iTerm2, Windows Terminal and
-  most Linux terminals have it), and make sure `NO_COLOR` is not set.
+- **The greys look flat or wrong.** Use a terminal with 256-color support (Terminal.app, iTerm2, Windows
+  Terminal and most Linux terminals have it), and make sure `NO_COLOR` is not set. For no styling at all, set `NO_COLOR=1`.
 - **Linux says it is a Wayland session.** Log in with an X11 / Xorg session instead.
 
 ## Roadmap
