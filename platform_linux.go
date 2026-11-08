@@ -57,3 +57,5 @@ func preflight() error {
 	}
 	return nil
 }
+
+func enableVT() bool { return true }

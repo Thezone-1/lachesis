@@ -14,3 +14,5 @@ func ActiveWindow() (app, title string, err error) { return "", "", errUnsupport
 func IdleDuration() time.Duration { return 0 }
 
 func preflight() error { return errUnsupported }
+
+func enableVT() bool { return false }

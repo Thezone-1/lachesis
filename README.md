@@ -62,6 +62,29 @@ Add the repos whose commits should count toward yield in `config.json`
 { "repos": ["C:\\Users\\you\\code\\my-project"] }
 ```
 
+### The live view
+
+On a terminal, `lachesis track` draws a small live view: a yarn ball spins at the left of a
+scrolling thread. The thread runs fast while you work on something productive, slows when
+you are neutral, frays when you are distracted, and freezes when you step away. If an app
+goes over its daily allotment, Atropos cuts the thread (✂). Under it you see the current
+app, today's active time, your focus block and a live score.
+
+```
+  L A C H E S I S  version 0.3.0
+  ╭────────────────────────────────────────────────────────────╮
+  │ ◑ ~~~~~o~~~~~~~o~~~~~~~~~o~~~~~~~o~~~~~~~~o~~~~~~~o~~~~~~~ │
+  ╰────────────────────────────────────────────────────────────╯
+  now    [+] productive  code main.go
+  today  3h42m active · 25m idle · focus block 1h20m
+  score  ███████░░░ 74  a well-measured day
+         focus 0.72 · depth 0.61 · cohesion 0.88 · yield 0.67
+```
+
+- It only animates on a real terminal. In the background, in a pipe or with `--plain`, it prints one line and stays quiet.
+- `--hide-titles` hides window titles, which is useful when you record a demo or share your screen.
+- `LACHESIS_ASCII=1` uses plain ASCII glyphs, and `NO_COLOR=1` turns colors off.
+
 ### Example report
 
 ```
