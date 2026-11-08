@@ -28,7 +28,8 @@ type live struct {
 	samples int
 	last    time.Time
 	now     time.Time
-	warn    string // set when the window cannot be read (e.g. a permission is missing)
+	session time.Time // when the running session started
+	warn    string    // set when the window cannot be read (e.g. a permission is missing)
 }
 
 // minScoreActive is how much activity a day needs before a score means anything.
@@ -133,7 +134,7 @@ func renderLive(l live, frame int, r *runner, o uiOpts) []string {
 		ago = fmt.Sprintf("%ds ago", int(l.now.Sub(l.last).Seconds()))
 	}
 	lines = append(lines,
-		"  "+paint(o, "32", beat+" tracking")+paint(o, "90", fmt.Sprintf(" · %d %s · last %s", l.samples, plural(l.samples, "sample", "samples"), ago)),
+		"  "+paint(o, "32", beat+" tracking")+paint(o, "90", sessionLabel(l)+fmt.Sprintf(" · %d %s · last %s", l.samples, plural(l.samples, "sample", "samples"), ago)),
 		fmt.Sprintf("  now    %s  %s", paint(o, tint, catTag(l.cat)+" "+state), now),
 		fmt.Sprintf("  today  %s active · %s idle · focus block %s", liveDur(l.m.Active), liveDur(l.m.Idle), liveDur(l.block)),
 	)
@@ -161,4 +162,11 @@ func plural(n int, one, many string) string {
 		return one
 	}
 	return many
+}
+
+func sessionLabel(l live) string {
+	if l.session.IsZero() || l.now.IsZero() {
+		return ""
+	}
+	return " · session " + liveDur(l.now.Sub(l.session))
 }

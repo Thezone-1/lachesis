@@ -31,23 +31,19 @@ go install github.com/Thezone-1/lachesis@latest
 ## Quick start
 
 ```powershell
-lachesis track                         # start the collector (leave it running)
+lachesis start --label "deep work"     # begin a session in the background
+lachesis status                        # is it running? since when?
+lachesis stop                          # end the session
+lachesis track                         # or run it in the foreground with the live view
 lachesis report                        # today's score, focus blocks, yield
 lachesis allot chrome 2h               # give chrome 2h a day; reports show overruns
 lachesis classify title youtube distracting
 ```
 
-Run it in the background:
-
-```powershell
-# Windows
-Start-Process lachesis.exe -ArgumentList track -WindowStyle Hidden
-```
-
-```sh
-# macOS / Linux
-nohup lachesis track >/dev/null 2>&1 &
-```
+`lachesis start` runs the tracker in the background and keeps running after you close the terminal.
+Only one session runs at a time. `lachesis stop` ends it cleanly, and `lachesis status` shows when it
+began. Sessions are recorded in `sessions.jsonl` and errors from a background session go to
+`lachesis.log`, both in the data folder.
 
 **macOS permissions.** The first run asks to control *System Events*. For window titles, also
 allow your terminal under *System Settings > Privacy & Security > Accessibility*. Without it
@@ -121,6 +117,20 @@ The 0–100 score is built only from ratios and outcomes:
   fewer) do not break a block. Idle always does.
 - **Yield** reads each configured repo's `git log` (read-only) and attributes each commit
   to the deep-work block that contains it, or the nearest one that ended within 30 minutes.
+
+## Resource use
+
+Measured over 30 seconds on an Apple Silicon Mac, with the window checked every 5 seconds:
+
+| | CPU | Memory |
+|---|---|---|
+| background (`start`, plain) | about 2% of one core | 26 MB peak |
+| live view (`track`) | about 2% of one core | 26 MB peak |
+
+The live view adds almost nothing. Most of the CPU goes on macOS to the system call that reads the
+front window (`osascript`, about 0.1 s of CPU per sample). Windows reads it directly and should
+use less, but that has not been measured yet. Lower the cost by raising `poll_seconds` in the
+config. Data grows by about 1.7 MB a day at the default settings.
 
 ## Privacy
 

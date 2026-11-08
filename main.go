@@ -14,7 +14,10 @@ var version = "0.3.0-dev"
 const usage = `lachesis %s — measures each thread and decides how much is allotted
 
 Usage:
-  lachesis track [--plain] [--hide-titles]
+  lachesis start [--label NAME]      start a background session (survives closing the terminal)
+  lachesis stop                      end the running session
+  lachesis status                    is a session running? since when?
+  lachesis track [--plain] [--hide-titles] [--label NAME]
                                      run the collector with a live view (--plain: quiet output;
                                      --hide-titles: for screen recordings)
   lachesis report [YYYY-MM-DD]      day's score, focus blocks, yield and per-app thread (default: today)
@@ -46,6 +49,12 @@ func main() {
 			day = os.Args[2]
 		}
 		err = printReport(day, cfg)
+	case "start":
+		err = startCmd(os.Args[2:])
+	case "stop":
+		err = stopCmd(cfg)
+	case "status":
+		err = statusCmd()
 	case "demo":
 		err = demo(os.Args[2:])
 	case "allot":
@@ -71,6 +80,11 @@ func track(cfg Config, args []string) error {
 	if err := preflight(); err != nil {
 		return err
 	}
+	info, err := acquireSession(flagValue(args, "--label"))
+	if err != nil {
+		return err
+	}
+	defer releaseSession(info)
 
 	animate := isTerminal(os.Stdout) && os.Getenv("LACHESIS_PLAIN") == ""
 	hideTitles := false
@@ -172,12 +186,19 @@ func track(cfg Config, args []string) error {
 			}
 			return nil
 		case now := <-poll.C:
+			if stopRequested() {
+				return nil
+			}
 			sampleNow(now)
 		case <-frames:
 			frame++
+			if frame%8 == 0 && stopRequested() {
+				return nil
+			}
 			run.step(frame, opts.width, state.cat, state.idle)
 			shown := state
 			shown.samples, shown.last, shown.now, shown.warn = len(samples), lastTS, time.Now(), lastErr
+			shown.session = info.Start
 			view.draw(renderLive(shown, frame, run, opts))
 		}
 	}
