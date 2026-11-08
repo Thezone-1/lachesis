@@ -11,17 +11,27 @@ import (
 
 var errLocked = errors.New("no foreground window (locked screen or login window)")
 
-// parseDarwinWindow parses the two-line output of the System Events script:
-// app name, then the front window title (possibly empty).
-func parseDarwinWindow(out string) (app, title string, err error) {
-	out = strings.TrimRight(out, "\r\n")
-	name, rest, _ := strings.Cut(out, "\n")
-	app = strings.ToLower(strings.TrimSpace(name))
-	title = strings.TrimSpace(rest)
-	if app == "" || app == "loginwindow" {
-		return "", "", errLocked
+var lsNameRe = regexp.MustCompile(`^"([^"]*)"`)
+
+// parseLSAppName reads the app name from `lsappinfo info -only name <asn>`.
+func parseLSAppName(out string) (string, error) {
+	m := lsNameRe.FindStringSubmatch(strings.TrimSpace(out))
+	if m == nil {
+		return "", errors.New("no application name")
 	}
-	return app, title, nil
+	name := strings.ToLower(strings.TrimSpace(m[1]))
+	if name == "" || name == "loginwindow" {
+		return "", errLocked
+	}
+	return name, nil
+}
+
+// isPermissionError reports whether osascript failed because macOS withheld
+// Automation (-1743) or Accessibility (-25211) access, as opposed to an app
+// simply having no window.
+func isPermissionError(out string) bool {
+	return strings.Contains(out, "-1743") || strings.Contains(out, "-25211") ||
+		strings.Contains(out, "not allowed assistive") || strings.Contains(out, "not authorized")
 }
 
 var hidIdleRe = regexp.MustCompile(`"HIDIdleTime"\s*=\s*(\d+)`)

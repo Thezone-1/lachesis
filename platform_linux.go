@@ -59,3 +59,16 @@ func preflight() error {
 }
 
 func enableVT() bool { return true }
+
+func titleNote() string { return "" }
+
+func platformChecks() []check {
+	err := preflight()
+	hint := ""
+	if err != nil {
+		hint = err.Error()
+	}
+	return []check{{"X11 session with xprop and xprintidle", err == nil, hint}}
+}
+
+func openPrivacySettings() {}

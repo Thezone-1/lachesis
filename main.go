@@ -14,6 +14,7 @@ var version = "0.3.0-dev"
 const usage = `lachesis %s — measures each thread and decides how much is allotted
 
 Usage:
+  lachesis doctor [--open]           check that everything works here, and how to fix what does not
   lachesis start [--label NAME]      start a background session (survives closing the terminal)
   lachesis stop                      end the running session
   lachesis status                    is a session running? since when?
@@ -49,6 +50,8 @@ func main() {
 			day = os.Args[2]
 		}
 		err = printReport(day, cfg)
+	case "doctor":
+		err = doctorCmd(os.Args[2:])
 	case "start":
 		err = startCmd(os.Args[2:])
 	case "stop":
@@ -137,6 +140,7 @@ func track(cfg Config, args []string) error {
 	fired := map[string]bool{}
 	var lastErr string
 	var lastTS time.Time
+	prevBlock := time.Duration(0)
 	sampleNow := func(now time.Time) {
 		if d := now.Format("2006-01-02"); d != today {
 			today, samples, fired = d, nil, map[string]bool{} // midnight: start a fresh day
@@ -146,7 +150,7 @@ func track(cfg Config, args []string) error {
 			s.Idle = true
 		} else if app, title, err := ActiveWindow(); err == nil {
 			s.App, s.Title = app, title
-			lastErr = ""
+			lastErr = titleNote()
 		} else {
 			s.Idle = true // locked screen / secure desktop counts as away
 			if err != errLocked {
@@ -161,11 +165,23 @@ func track(cfg Config, args []string) error {
 		if animate {
 			state = buildLive(samples, s, cfg)
 			state.hi = hi
+			if !state.idle && prevBlock < deepWorkMin && state.block >= deepWorkMin {
+				run.startCelebrate()
+			}
+			prevBlock = state.block
 			if state.cut != "" && !fired[state.cut] {
 				fired[state.cut] = true
 				run.startCut(state.cut)
 			}
 		}
+	}
+	finish := func() {
+		if !animate {
+			fmt.Println("thread paused")
+			return
+		}
+		view.close()
+		printRecap(info.Start, time.Now(), info.Label, cfg)
 	}
 	sampleNow(time.Now())
 
@@ -181,18 +197,18 @@ func track(cfg Config, args []string) error {
 	for {
 		select {
 		case <-stop:
-			if !animate {
-				fmt.Println("thread paused")
-			}
+			finish()
 			return nil
 		case now := <-poll.C:
 			if stopRequested() {
+				finish()
 				return nil
 			}
 			sampleNow(now)
 		case <-frames:
 			frame++
 			if frame%8 == 0 && stopRequested() {
+				finish()
 				return nil
 			}
 			run.step(frame, opts.width, state.cat, state.idle)

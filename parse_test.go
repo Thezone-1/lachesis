@@ -5,20 +5,28 @@ import (
 	"time"
 )
 
-func TestParseDarwinWindow(t *testing.T) {
-	app, title, err := parseDarwinWindow("Google Chrome\nInbox - Gmail\n")
-	if err != nil || app != "google chrome" || title != "Inbox - Gmail" {
-		t.Fatalf("got %q %q %v", app, title, err)
+func TestParseLSAppName(t *testing.T) {
+	app, err := parseLSAppName(`"Google Chrome" ASN:0x0-0x1b01b: (in front)` + "\n  bundleID=[ NULL ]\n")
+	if err != nil || app != "google chrome" {
+		t.Fatalf("got %q %v", app, err)
 	}
-	app, title, err = parseDarwinWindow("Finder\n\n")
-	if err != nil || app != "finder" || title != "" {
-		t.Fatalf("empty title: got %q %q %v", app, title, err)
-	}
-	if _, _, err = parseDarwinWindow("loginwindow\n\n"); err == nil {
+	if _, err = parseLSAppName(`"loginwindow" ASN:0x0-0x1: (in front)`); err == nil {
 		t.Fatal("login window must count as away")
 	}
-	if _, _, err = parseDarwinWindow(""); err == nil {
-		t.Fatal("empty output must be an error")
+	if _, err = parseLSAppName("garbage"); err == nil {
+		t.Fatal("unparseable output must be an error")
+	}
+}
+
+func TestIsPermissionError(t *testing.T) {
+	if !isPermissionError("execution error: Not authorized to send Apple events to System Events. (-1743)") {
+		t.Fatal("-1743 is a permission problem")
+	}
+	if !isPermissionError("osascript is not allowed assistive access. (-25211)") {
+		t.Fatal("-25211 is a permission problem")
+	}
+	if isPermissionError("execution error: Can't get window 1 of process. Invalid index. (-1719)") {
+		t.Fatal("an app with no window is not a permission problem")
 	}
 }
 

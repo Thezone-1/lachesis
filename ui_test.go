@@ -135,3 +135,41 @@ func TestBanterNamesTheApp(t *testing.T) {
 		}
 	}
 }
+
+func TestCelebrationSparklesAndResets(t *testing.T) {
+	r := newRunner()
+	r.startCelebrate()
+	for f := 1; f < celebFrames/2; f++ {
+		r.step(f, testWidth, Productive, false)
+	}
+	c := r.drawCanvas(testWidth, false)
+	found := false
+	for y := range c.s {
+		for _, st := range c.s[y] {
+			if st >= stSpark1 {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatal("sparkles should be drawn while celebrating")
+	}
+	for f := celebFrames / 2; f < celebFrames+2; f++ {
+		r.step(f, testWidth, Productive, false)
+	}
+	if r.celebrating() {
+		t.Fatal("the celebration should end")
+	}
+}
+
+func TestColoursOnlyWhenEnabled(t *testing.T) {
+	l := live{sample: Sample{App: "code"}, cat: Productive, m: DayMetrics{Active: time.Hour}, score: Score{Total: 74}}
+	plain := strings.Join(renderLive(l, 1, newRunner(), uiOpts{width: testWidth}), "\n")
+	if strings.Contains(plain, "\x1b[") {
+		t.Fatal("no escape codes when colour is off")
+	}
+	coloured := strings.Join(renderLive(l, 1, newRunner(), uiOpts{width: testWidth, color: true}), "\n")
+	if !strings.Contains(coloured, "\x1b[1;38;5;") {
+		t.Fatal("expected 256-colour codes when colour is on")
+	}
+}

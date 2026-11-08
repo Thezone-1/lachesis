@@ -185,7 +185,11 @@ func startCmd(args []string) error {
 
 	for i := 0; i < 40; i++ {
 		if cur, ok := runningSession(); ok && cur.PID == pid {
-			fmt.Printf("Lachesis is spinning the thread (pid %d). Stop it with `lachesis stop`.\n", pid)
+			o := uiOpts{color: isTerminal(os.Stdout) && os.Getenv("NO_COLOR") == ""}
+			fmt.Printf("%s Lachesis is spinning the thread (pid %d). End the session with `lachesis stop`.\n", paint(o, "1;38;5;82", "●"), pid)
+			if note := titleNote(); note != "" {
+				fmt.Println("  note: " + note)
+			}
 			return nil
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -207,6 +211,7 @@ func stopCmd(cfg Config) error {
 	for time.Now().Before(deadline) {
 		if _, still := runningSession(); !still {
 			fmt.Printf("thread paused after %s\n", liveDur(time.Since(cur.Start)))
+			printRecap(cur.Start, time.Now(), cur.Label, cfg)
 			return nil
 		}
 		time.Sleep(100 * time.Millisecond)

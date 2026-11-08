@@ -16,3 +16,11 @@ func IdleDuration() time.Duration { return 0 }
 func preflight() error { return errUnsupported }
 
 func enableVT() bool { return false }
+
+func titleNote() string { return "" }
+
+func platformChecks() []check {
+	return []check{{"window tracking on this platform", false, "not supported on this platform"}}
+}
+
+func openPrivacySettings() {}

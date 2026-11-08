@@ -70,6 +70,9 @@ func demo(args []string) error {
 			if cur.cut && local == 0 {
 				run.startCut("chrome")
 			}
+			if cur.name == script[0].name && local == 70 {
+				run.startCelebrate()
+			}
 			run.step(frame, opts.width, cur.cat, cur.idle)
 			l := live{
 				sample:  Sample{App: "demo", Title: cur.name},

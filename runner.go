@@ -7,15 +7,16 @@ import (
 )
 
 const (
-	sceneRows = 5 // three rows of sky, the ball row, and the thread
-	ballRow   = 3
-	groundRow = 4
-	ballX     = 10
-	obsW      = 3
-	jumpSpan  = 10 // cells scrolled during one jump
-	cutFrames = 48 // length of the scissors scene, in frames
-	cutX      = ballX + 12
-	minWidth  = 30
+	sceneRows   = 5 // three rows of sky, the ball row, and the thread
+	ballRow     = 3
+	groundRow   = 4
+	ballX       = 10
+	obsW        = 3
+	jumpSpan    = 10 // cells scrolled during one jump
+	cutFrames   = 48 // length of the scissors scene, in frames
+	celebFrames = 28 // length of the sparkle celebration, in frames
+	cutX        = ballX + 12
+	minWidth    = 30
 )
 
 // jumpHeight is how many rows above the ground the ball is after each cell of a jump.
@@ -43,11 +44,12 @@ type runner struct {
 	jump      int   // cells into the current jump, -1 when on the ground
 	bump      int   // frames left of the stumble after hitting an obstacle
 	cutF      int   // frame of the scissors scene, -1 when not cutting
+	celeb     int   // frame of the sparkle celebration, -1 when none
 	cutApp    string
 }
 
 func newRunner() *runner {
-	return &runner{jump: -1, cutF: -1, untilNext: 18}
+	return &runner{jump: -1, cutF: -1, celeb: -1, untilNext: 18}
 }
 
 // cellsThisFrame is how far the world scrolls: fast when productive, slow when
@@ -79,12 +81,26 @@ func (r *runner) startCut(app string) {
 
 func (r *runner) cutting() bool { return r.cutF >= 0 }
 
+// startCelebrate plays the sparkles for a completed deep-work block.
+func (r *runner) startCelebrate() {
+	if r.celeb < 0 {
+		r.celeb = 0
+	}
+}
+
+func (r *runner) celebrating() bool { return r.celeb >= 0 }
+
 // step advances the world by one frame.
 func (r *runner) step(frame, width int, cat Category, idle bool) {
+	if r.celeb >= 0 {
+		if r.celeb++; r.celeb >= celebFrames {
+			r.celeb = -1
+		}
+	}
 	if r.cutF >= 0 {
 		r.cutF++
 		if r.cutF >= cutFrames {
-			*r = runner{jump: -1, cutF: -1, untilNext: 18, scroll: r.scroll}
+			*r = runner{jump: -1, cutF: -1, celeb: -1, untilNext: 18, scroll: r.scroll}
 		}
 		return
 	}
@@ -132,40 +148,77 @@ func (r *runner) step(frame, width int, cat Category, idle bool) {
 	}
 }
 
-func put(row []rune, x int, s string) {
-	for i, c := range []rune(s) {
-		if x+i >= 0 && x+i < len(row) && c != ' ' {
-			row[x+i] = c
+// Styles say what a cell is, so the renderer can colour it.
+const (
+	stNone uint8 = iota
+	stThread
+	stDash
+	stBall
+	stObstacle
+	stScissors
+	stBanner
+	stSpark1
+	stSpark2
+	stSpark3
+)
+
+type canvas struct {
+	r [][]rune
+	s [][]uint8
+}
+
+func newCanvas(w int) canvas {
+	c := canvas{r: make([][]rune, sceneRows), s: make([][]uint8, sceneRows)}
+	for i := range c.r {
+		c.r[i] = []rune(strings.Repeat(" ", w))
+		c.s[i] = make([]uint8, w)
+	}
+	return c
+}
+
+// put writes text at (y, x), skipping spaces so sprites can overlap the thread.
+func (c canvas) put(y, x int, text string, st uint8) {
+	if y < 0 || y >= len(c.r) {
+		return
+	}
+	for i, ch := range []rune(text) {
+		if x+i >= 0 && x+i < len(c.r[y]) && ch != ' ' {
+			c.r[y][x+i], c.s[y][x+i] = ch, st
 		}
 	}
 }
 
-// draw renders the world, w cells wide.
-func (r *runner) draw(w int, cat Category, idle bool) [sceneRows]string {
+// drawCanvas renders the world, w cells wide, with a style for every cell.
+func (r *runner) drawCanvas(w int, idle bool) canvas {
 	if w < minWidth {
 		w = minWidth
 	}
-	rows := make([][]rune, sceneRows)
-	for i := range rows {
-		rows[i] = []rune(strings.Repeat(" ", w))
+	c := newCanvas(w)
+
+	if r.celeb >= 0 {
+		for i := 0; i < 14; i++ {
+			x := (i*7 + r.celeb*5 + i*i) % w
+			y := (i*3 + r.celeb/2) % 3
+			c.put(y, x, string("*+.'`"[(i+r.celeb)%5]), stSpark1+uint8(i%3))
+		}
 	}
 
 	// The thread: solid behind the ball (already spun), dashed ahead (still to spin).
 	for x := 0; x < w; x++ {
 		switch {
 		case x < ballX:
-			rows[groundRow][x] = '~'
+			c.r[groundRow][x], c.s[groundRow][x] = '~', stThread
 		case (x+r.scroll)%4 < 2:
-			rows[groundRow][x] = '-'
+			c.r[groundRow][x], c.s[groundRow][x] = '-', stDash
 		}
 	}
 	if r.cutF >= 20 {
 		for x := cutX + 3; x < w; x++ {
-			rows[groundRow][x] = ' '
+			c.r[groundRow][x], c.s[groundRow][x] = ' ', stNone
 		}
 	}
 	for _, o := range r.obs {
-		put(rows[ballRow], o, "[!]")
+		c.put(ballRow, o, "[!]", stObstacle)
 	}
 
 	h := 0
@@ -179,11 +232,11 @@ func (r *runner) draw(w int, cat Category, idle bool) [sceneRows]string {
 	case idle:
 		face = "-"
 	}
-	put(rows[ballRow-h], ballX, "("+face+")")
+	c.put(ballRow-h, ballX, "("+face+")", stBall)
 
 	if r.cutF >= 0 {
 		if r.cutF >= 14 {
-			put(rows[0], 2, "G A M E   O V E R")
+			c.put(0, 2, "G A M E   O V E R", stBanner)
 		}
 		var top int
 		switch {
@@ -199,15 +252,18 @@ func (r *runner) draw(w int, cat Category, idle bool) [sceneRows]string {
 			sprite = scissorsOpen
 		}
 		for i, line := range sprite {
-			if y := top + i; y >= 0 && y < sceneRows {
-				put(rows[y], cutX-2, line)
-			}
+			c.put(top+i, cutX-2, line, stScissors)
 		}
 	}
+	return c
+}
 
+// draw renders the world as plain text rows.
+func (r *runner) draw(w int, cat Category, idle bool) [sceneRows]string {
+	c := r.drawCanvas(w, idle)
 	var out [sceneRows]string
-	for i := range rows {
-		out[i] = string(rows[i])
+	for i := range c.r {
+		out[i] = string(c.r[i])
 	}
 	return out
 }

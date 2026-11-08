@@ -98,3 +98,16 @@ func enableVT() bool {
 	ok, _, _ := setMode.Call(h, uintptr(mode|0x0004)) // ENABLE_VIRTUAL_TERMINAL_PROCESSING
 	return ok != 0
 }
+
+func titleNote() string { return "" }
+
+func platformChecks() []check {
+	_, _, err := ActiveWindow()
+	hint := ""
+	if err != nil {
+		hint = err.Error() + " (a locked screen or elevated window can cause this once; run it again)"
+	}
+	return []check{{"can read the foreground window", err == nil, hint}}
+}
+
+func openPrivacySettings() {}
