@@ -23,12 +23,19 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
 
-  build-windows:
+  cross-build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [windows/amd64, windows/arm64, darwin/amd64, darwin/arm64, linux/amd64, linux/arm64]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: GOOS=windows GOARCH=amd64 go build -o /dev/null .
-      - run: GOOS=windows GOARCH=arm64 go build -o /dev/null .
+      - name: build ${{ matrix.target }}
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          target="${{ matrix.target }}"
+          GOOS="${target%/*}" GOARCH="${target#*/}" go build -o /dev/null .

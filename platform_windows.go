@@ -78,3 +78,5 @@ func IdleDuration() time.Duration {
 	// uint32 arithmetic handles tick-count wraparound (~49 days)
 	return time.Duration(uint32(tick)-info.dwTime) * time.Millisecond
 }
+
+func preflight() error { return nil }

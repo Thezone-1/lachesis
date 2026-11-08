@@ -11,14 +11,16 @@ leave an editor focused and look busy. Ratios and artifacts are much harder to f
 - **Scores outcomes.** Commits are linked to the focus block they came from.
 - **Resists gaming.** A block that loops one window title is flagged instead of rewarded.
 
-> **Status: v0.3 (early).** Window tracking works on **Windows** today. Reports and
-> tests run on Windows, macOS and Linux. macOS and Linux tracking are on the roadmap below.
+> **Status: v0.3 (early).** Tracking works on **Windows** and **macOS**. **Linux** support
+> (X11 only, needs `xprop` and `xprintidle`) is implemented but experimental: it is
+> unit-tested and cross-built in CI, and has not yet had broad testing on real desktops.
+> Wayland is not supported yet.
 
 ## Install
 
-**Download a release (recommended).** Grab the zip for your CPU from the
-[Releases](https://github.com/Thezone-1/lachesis/releases) page, unzip it, and put
-`lachesis.exe` somewhere on your `PATH`.
+**Download a release (recommended).** Grab the archive for your OS and CPU from the
+[Releases](https://github.com/Thezone-1/lachesis/releases) page, unpack it, and put
+`lachesis` somewhere on your `PATH`.
 
 **With Go 1.23+:**
 
@@ -35,11 +37,23 @@ lachesis allot chrome 2h               # give chrome 2h a day; reports show over
 lachesis classify title youtube distracting
 ```
 
-Run it in the background on Windows:
+Run it in the background:
 
 ```powershell
+# Windows
 Start-Process lachesis.exe -ArgumentList track -WindowStyle Hidden
 ```
+
+```sh
+# macOS / Linux
+nohup lachesis track >/dev/null 2>&1 &
+```
+
+**macOS permissions.** The first run asks to control *System Events*. For window titles, also
+allow your terminal under *System Settings > Privacy & Security > Accessibility*. Without it
+Lachesis still tracks the app name, with an empty title.
+
+**Linux.** Install the helpers once: `sudo apt install x11-utils xprintidle`.
 
 Add the repos whose commits should count toward yield in `config.json`
 (see [Configuration](#configuration)):
@@ -112,12 +126,13 @@ automatically on first run.
 
 ## Roadmap
 
-- [x] Window tracking, focus blocks, yield scoring, allotments (Windows)
+- [x] Window tracking, focus blocks, yield scoring, allotments (Windows, macOS)
 - [ ] **AI leverage:** link local AI-assistant usage counts (never content) to shipped
       artifacts, giving "tokens per commit"
 - [ ] **MCP server:** let an AI assistant ask "how was my week?" and get focus, yield and
       leverage numbers
-- [ ] macOS and Linux tracking
+- [x] macOS tracking
+- [ ] Linux: more testing on real desktops, Wayland (sway, Hyprland, GNOME)
 - [ ] Homebrew, winget and scoop packages
 
 ## Contributing

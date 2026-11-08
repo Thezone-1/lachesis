@@ -59,6 +59,9 @@ func main() {
 
 // track samples the foreground window every poll interval until interrupted.
 func track(cfg Config) error {
+	if err := preflight(); err != nil {
+		return err
+	}
 	fmt.Printf("lachesis %s — spinning the thread (every %ds, idle after %ds)\n",
 		version, cfg.PollSeconds, cfg.IdleSeconds)
 	fmt.Println("data:", dataDir())

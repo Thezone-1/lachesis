@@ -36,6 +36,17 @@ func defaultRules() []Rule {
 		{Match: "app", Pattern: "code", Category: Productive},
 		{Match: "app", Pattern: "windowsterminal", Category: Productive},
 		{Match: "app", Pattern: "goland", Category: Productive},
+		{Match: "app", Pattern: "cursor", Category: Productive},
+		{Match: "app", Pattern: "zed", Category: Productive},
+		{Match: "app", Pattern: "intellij", Category: Productive},
+		{Match: "app", Pattern: "pycharm", Category: Productive},
+		{Match: "app", Pattern: "terminal", Category: Productive},
+		{Match: "app", Pattern: "iterm", Category: Productive},
+		{Match: "app", Pattern: "ghostty", Category: Productive},
+		{Match: "app", Pattern: "alacritty", Category: Productive},
+		{Match: "app", Pattern: "kitty", Category: Productive},
+		{Match: "app", Pattern: "wezterm", Category: Productive},
+		{Match: "app", Pattern: "konsole", Category: Productive},
 	}
 }
 

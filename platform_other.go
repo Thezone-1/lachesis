@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !darwin && !linux
 
 package main
 
@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-var errUnsupported = errors.New("window tracking is not supported on this platform yet (windows only)")
+var errUnsupported = errors.New("window tracking is not supported on this platform")
 
-// ActiveWindow is unavailable off Windows; reports and tests still run.
 func ActiveWindow() (app, title string, err error) { return "", "", errUnsupported }
 
-// IdleDuration is unavailable off Windows.
 func IdleDuration() time.Duration { return 0 }
+
+func preflight() error { return errUnsupported }

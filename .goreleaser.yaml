@@ -7,13 +7,16 @@ builds:
     binary: lachesis
     env:
       - CGO_ENABLED=0
-    goos: [windows]
+    goos: [windows, darwin, linux]
     goarch: [amd64, arm64]
     ldflags:
       - -s -w -X main.version={{.Version}}
 
 archives:
-  - formats: [zip]
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
     name_template: "lachesis_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
