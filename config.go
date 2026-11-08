@@ -11,10 +11,11 @@ import (
 type Config struct {
 	PollSeconds int               `json:"poll_seconds"`
 	IdleSeconds int               `json:"idle_seconds"`
-	Allotments  map[string]string `json:"allotments"` // app -> duration ("2h", "90m")
-	Rules       []Rule            `json:"rules"`      // classification rules, title rules before app rules
-	Repos       []string          `json:"repos"`      // git repos scanned for commit yield
-	Weights     Weights           `json:"weights"`    // score component weights, must sum to 100
+	Allotments  map[string]string `json:"allotments"`      // app -> duration ("2h", "90m")
+	Rules       []Rule            `json:"rules"`           // classification rules, title rules before app rules
+	Repos       []string          `json:"repos"`           // git repos scanned for commit yield
+	Weights     Weights           `json:"weights"`         // score component weights, must sum to 100
+	Theme       string            `json:"theme,omitempty"` // "mono" (default) or "color"
 }
 
 // Weights are the score components; each component is a 0–1 ratio.
@@ -37,10 +38,6 @@ func defaultConfig() Config {
 		Rules:       defaultRules(),
 		Weights:     defaultWeights(),
 	}
-}
-
-func baseDir() string {
-	return filepath.Join(os.Getenv("LOCALAPPDATA"), "lacheisis")
 }
 
 func configPath() string {
@@ -73,14 +70,14 @@ func loadConfig() Config {
 }
 
 func saveConfig(cfg Config) error {
-	if err := os.MkdirAll(baseDir(), 0o755); err != nil {
+	if err := os.MkdirAll(baseDir(), 0o700); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(configPath(), data, 0o644)
+	return os.WriteFile(configPath(), data, 0o600)
 }
 
 // allotmentFor returns the parsed daily allotment for an app, or 0 if none set.

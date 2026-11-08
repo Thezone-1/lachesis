@@ -26,10 +26,10 @@ func dayFile(day string) string {
 
 // appendSample appends one sample to the JSONL file for its local date.
 func appendSample(s Sample) error {
-	if err := os.MkdirAll(dataDir(), 0o755); err != nil {
+	if err := os.MkdirAll(dataDir(), 0o700); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(dayFile(s.TS.Format("2006-01-02")), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(dayFile(s.TS.Format("2006-01-02")), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}

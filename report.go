@@ -77,7 +77,7 @@ func printReport(day string, cfg Config) error {
 		return err
 	}
 	if len(samples) == 0 {
-		fmt.Printf("Lacheisis — %s\nNo thread measured. Is `lacheisis track` running?\n", day)
+		fmt.Printf("Lachesis — %s\nNo thread measured. Is `lachesis track` running?\n", day)
 		return nil
 	}
 
@@ -85,8 +85,12 @@ func printReport(day string, cfg Config) error {
 	orphans := attributeCommits(m.Blocks, dayCommits(cfg.Repos, day))
 	score := computeScore(m, cfg.Weights)
 
-	fmt.Printf("Lacheisis — %s\n", day)
-	fmt.Printf("Score %d — %s\n", score.Total, verdict(score.Total))
+	fmt.Printf("Lachesis — %s\n", day)
+	if m.Active < minScoreActive {
+		fmt.Printf("Score -- — warming up (%s of activity so far, a score needs %s)\n", fmtDur(m.Active), fmtDur(minScoreActive))
+	} else {
+		fmt.Printf("Score %d — %s\n", score.Total, verdict(score.Total))
+	}
 	fmt.Printf("  focus %.2f · depth %.2f · cohesion %.2f · yield %.2f\n",
 		score.Focus, score.Depth, score.Cohesion, score.Yield)
 	fmt.Printf("Thread measured: %s active · %s idle\n", fmtDur(m.Active), fmtDur(m.Idle))

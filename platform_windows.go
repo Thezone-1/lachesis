@@ -1,3 +1,5 @@
+//go:build windows
+
 package main
 
 import (
@@ -76,3 +78,36 @@ func IdleDuration() time.Duration {
 	// uint32 arithmetic handles tick-count wraparound (~49 days)
 	return time.Duration(uint32(tick)-info.dwTime) * time.Millisecond
 }
+
+func preflight() error { return nil }
+
+// enableVT turns on ANSI escape processing so the live view works in the
+// Windows console. It reports false if the console refuses.
+func enableVT() bool {
+	getStd := kernel32.NewProc("GetStdHandle")
+	getMode := kernel32.NewProc("GetConsoleMode")
+	setMode := kernel32.NewProc("SetConsoleMode")
+	h, _, _ := getStd.Call(uintptr(^uint32(10))) // STD_OUTPUT_HANDLE
+	if h == 0 || h == ^uintptr(0) {
+		return false
+	}
+	var mode uint32
+	if ok, _, _ := getMode.Call(h, uintptr(unsafe.Pointer(&mode))); ok == 0 {
+		return false
+	}
+	ok, _, _ := setMode.Call(h, uintptr(mode|0x0004)) // ENABLE_VIRTUAL_TERMINAL_PROCESSING
+	return ok != 0
+}
+
+func titleNote() string { return "" }
+
+func platformChecks() []check {
+	_, _, err := ActiveWindow()
+	hint := ""
+	if err != nil {
+		hint = err.Error() + " (a locked screen or elevated window can cause this once; run it again)"
+	}
+	return []check{{"can read the foreground window", err == nil, hint}}
+}
+
+func openPrivacySettings() {}

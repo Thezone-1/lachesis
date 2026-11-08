@@ -36,6 +36,17 @@ func defaultRules() []Rule {
 		{Match: "app", Pattern: "code", Category: Productive},
 		{Match: "app", Pattern: "windowsterminal", Category: Productive},
 		{Match: "app", Pattern: "goland", Category: Productive},
+		{Match: "app", Pattern: "cursor", Category: Productive},
+		{Match: "app", Pattern: "zed", Category: Productive},
+		{Match: "app", Pattern: "intellij", Category: Productive},
+		{Match: "app", Pattern: "pycharm", Category: Productive},
+		{Match: "app", Pattern: "terminal", Category: Productive},
+		{Match: "app", Pattern: "iterm", Category: Productive},
+		{Match: "app", Pattern: "ghostty", Category: Productive},
+		{Match: "app", Pattern: "alacritty", Category: Productive},
+		{Match: "app", Pattern: "kitty", Category: Productive},
+		{Match: "app", Pattern: "wezterm", Category: Productive},
+		{Match: "app", Pattern: "konsole", Category: Productive},
 	}
 }
 
@@ -61,7 +72,7 @@ func classifySample(s Sample, rules []Rule) Category {
 	return Neutral
 }
 
-// classify implements `lacheisis classify [<app|title> <pattern> <category>]`:
+// classify implements `lachesis classify [<app|title> <pattern> <category>]`:
 // with no args it lists rules, otherwise it appends one.
 func classify(cfg Config, args []string) error {
 	if len(args) == 0 {
@@ -75,7 +86,7 @@ func classify(cfg Config, args []string) error {
 		return nil
 	}
 	if len(args) != 3 {
-		return fmt.Errorf("usage: lacheisis classify <app|title> <pattern> <category>")
+		return fmt.Errorf("usage: lachesis classify <app|title> <pattern> <category>")
 	}
 	match, pattern, cat := args[0], args[1], Category(args[2])
 	if match != "app" && match != "title" {
