@@ -69,14 +69,14 @@ func loadConfig() Config {
 }
 
 func saveConfig(cfg Config) error {
-	if err := os.MkdirAll(baseDir(), 0o755); err != nil {
+	if err := os.MkdirAll(baseDir(), 0o700); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(configPath(), data, 0o644)
+	return os.WriteFile(configPath(), data, 0o600)
 }
 
 // allotmentFor returns the parsed daily allotment for an app, or 0 if none set.
