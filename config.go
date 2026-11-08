@@ -39,10 +39,6 @@ func defaultConfig() Config {
 	}
 }
 
-func baseDir() string {
-	return filepath.Join(os.Getenv("LOCALAPPDATA"), "lacheisis")
-}
-
 func configPath() string {
 	return filepath.Join(baseDir(), "config.json")
 }

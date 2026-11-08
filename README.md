@@ -1,34 +1,58 @@
-# lacheisis
+# Lachesis
 
-Lachesis measures each thread and decides how much is allotted, Atropos cuts it.
+Lachesis measures each thread and decides how much is allotted. Atropos cuts it.
 
-A zero-dependency Windows productivity tracker in Go. It samples your foreground
-window every few seconds, measures where your time actually goes, and scores the
-day by **yield** — outcomes per focused hour — never volume. Volume metrics get
-farmed (Goodhart); ratios and artifacts don't.
+A local-first productivity tracker for developers. It samples your foreground
+window, finds your deep-work blocks, and scores the day by **yield** (outcomes per
+focused hour), not by how long a window stayed open. Time-in-app is easy to farm:
+leave an editor focused and look busy. Ratios and artifacts are much harder to fake.
 
-## Usage
+- **One binary, no dependencies, no account, no network.** Everything stays on your machine.
+- **Scores outcomes.** Commits are linked to the focus block they came from.
+- **Resists gaming.** A block that loops one window title is flagged instead of rewarded.
+
+> **Status: v0.3 (early).** Window tracking works on **Windows** today. Reports and
+> tests run on Windows, macOS and Linux. macOS and Linux tracking are on the roadmap below.
+
+## Install
+
+**Download a release (recommended).** Grab the zip for your CPU from the
+[Releases](https://github.com/Thezone-1/lachesis/releases) page, unzip it, and put
+`lachesis.exe` somewhere on your `PATH`.
+
+**With Go 1.23+:**
 
 ```
-go build -o lacheisis.exe .
-
-lacheisis track                    # run the collector (detach with Start-Process)
-lacheisis report [YYYY-MM-DD]      # score, focus blocks, commit yield, per-app thread
-lacheisis allot chrome 2h          # give chrome 2h/day; report shows overruns
-lacheisis classify title youtube distracting   # add a classification rule
+go install github.com/Thezone-1/lachesis@latest
 ```
 
-Run it in the background:
+## Quick start
 
 ```powershell
-Start-Process lacheisis.exe -ArgumentList track -WindowStyle Hidden
+lachesis track                         # start the collector (leave it running)
+lachesis report                        # today's score, focus blocks, yield
+lachesis allot chrome 2h               # give chrome 2h a day; reports show overruns
+lachesis classify title youtube distracting
 ```
 
-Example report:
+Run it in the background on Windows:
+
+```powershell
+Start-Process lachesis.exe -ArgumentList track -WindowStyle Hidden
+```
+
+Add the repos whose commits should count toward yield in `config.json`
+(see [Configuration](#configuration)):
+
+```json
+{ "repos": ["C:\\Users\\you\\code\\my-project"] }
+```
+
+### Example report
 
 ```
-Lacheisis — 2026-07-12
-Score 74 — a well-measured day
+Lachesis, 2026-07-12
+Score 74: a well-measured day
   focus 0.72 · depth 0.61 · cohesion 0.88 · yield 0.67
 Thread measured: 3h42m active · 25m idle
   [+] productive 2h40m · [·] neutral 45m · [!] distracting 17m
@@ -36,43 +60,71 @@ Thread measured: 3h42m active · 25m idle
 
   [+] code                     2h10m  ████████████████████
   [·] chrome                   1h05m  ██████████  (54% of 2h allotted)
-  [+] windowsterminal            27m  ████
 
-Deep work — 2 block(s), 1h55m total, longest 1h20m, 4 switches/h:
-  09:12–10:32  code             1h20m  ● a1b2c3f fix sessionizer (lacheisis)
-  11:04–11:39  code               35m
-
-✂ Atropos: slack exceeded its allotment (1h30m / 1h)
+Deep work, 2 block(s), 1h55m total, longest 1h20m, 4 switches/h:
+  09:12–10:32  code             1h20m  ● a1b2c3f fix sessionizer (lachesis)
 ```
 
-## Scoring (v0.2): attendance is farmable, yield is not
+## How the score works
 
-Foreground hours can be farmed — leave an editor focused and look busy. So the
-0–100 score is built only from ratios and outcomes:
+The 0–100 score is built only from ratios and outcomes:
 
 | Component | Definition | Weight |
 |-----------|-----------|--------|
 | Focus     | productive time / active time | 35 |
-| Depth     | deep-work time (≥25 min productive blocks) / productive time | 25 |
+| Depth     | deep-work time (blocks of 25+ min) / productive time | 25 |
 | Cohesion  | 1 − min(1, context switches per active hour / 30) | 15 |
 | Yield     | commit-linked deep-work hours / deep-work hours | 25 |
 
-- **Rules** classify every sample `productive | neutral | distracting`; title
-  rules run before app rules (chrome on YouTube is distracting even if chrome
-  is neutral). Manage with `lacheisis classify`.
-- **Focus blocks** sessionize the sample stream: alt-tab glances (≤2 samples)
-  don't break a block, idle always does.
-- **Yield** scans the configured `"repos"` (read-only `git log`) and attributes
-  each commit to the deep-work block containing it, or the nearest one that
-  ended ≤30 min before.
-- **Anti-gaming**: farmed activity loops one window title. Deep blocks with
-  near-zero title entropy are flagged `⚠ looping?`, and no metric anywhere
-  rewards raw volume.
+- **Rules** label every sample `productive`, `neutral` or `distracting`. Title rules run
+  before app rules, so Chrome on YouTube is distracting even if Chrome is neutral.
+- **Focus blocks** are built from the sample stream. Short alt-tab glances (2 samples or
+  fewer) do not break a block. Idle always does.
+- **Yield** reads each configured repo's `git log` (read-only) and attributes each commit
+  to the deep-work block that contains it, or the nearest one that ended within 30 minutes.
 
-## How it works
+## Privacy
 
-- Win32 `GetForegroundWindow` → process image name, sampled every 5s
-- `GetLastInputInfo` marks you idle after 60s without input; locked screen counts as away
-- Samples land in append-only JSONL at `%LOCALAPPDATA%\lacheisis\data\`, one file per day
-- Config (poll interval, idle threshold, allotments, rules, repos, score
-  weights) at `%LOCALAPPDATA%\lacheisis\config.json`
+Lachesis records the **app name and window title** every 5 seconds, plus an idle flag.
+Window titles can contain sensitive text (document names, tab titles).
+
+- Data is written only to local JSONL files, one per day. There is no network code.
+- Delete the data folder at any time to erase everything.
+- It reads `git log` of the repos you list, nothing else about them.
+
+Data folder: `%LOCALAPPDATA%\lachesis` on Windows, `~/Library/Application Support/lachesis`
+on macOS, `$XDG_DATA_HOME/lachesis` (or `~/.local/share/lachesis`) on Linux.
+If you used the project before it was renamed (`lacheisis`), your folder is moved
+automatically on first run.
+
+## Configuration
+
+`config.json` in the data folder. Every key is optional.
+
+| Key | Meaning | Default |
+|-----|---------|---------|
+| `poll_seconds` | sampling interval | 5 |
+| `idle_seconds` | idle after this long without input | 60 |
+| `allotments` | per-app daily limits, e.g. `{"chrome": "2h"}` | none |
+| `rules` | classification rules | built-in set |
+| `repos` | git repos scanned for commit yield | none |
+| `weights` | score weights (focus, depth, cohesion, yield; sum to 100) | 35/25/15/25 |
+
+## Roadmap
+
+- [x] Window tracking, focus blocks, yield scoring, allotments (Windows)
+- [ ] **AI leverage:** link local AI-assistant usage counts (never content) to shipped
+      artifacts, giving "tokens per commit"
+- [ ] **MCP server:** let an AI assistant ask "how was my week?" and get focus, yield and
+      leverage numbers
+- [ ] macOS and Linux tracking
+- [ ] Homebrew, winget and scoop packages
+
+## Contributing
+
+Issues and PRs are welcome. Run `go vet ./... && go test ./...` before opening one.
+CI runs the same checks on Windows, macOS and Linux.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

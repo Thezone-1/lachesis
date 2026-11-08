@@ -1,3 +1,3 @@
-module github.com/Thezone-1/lacheisis
+module github.com/Thezone-1/lachesis
 
 go 1.23

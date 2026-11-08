@@ -61,7 +61,7 @@ func classifySample(s Sample, rules []Rule) Category {
 	return Neutral
 }
 
-// classify implements `lacheisis classify [<app|title> <pattern> <category>]`:
+// classify implements `lachesis classify [<app|title> <pattern> <category>]`:
 // with no args it lists rules, otherwise it appends one.
 func classify(cfg Config, args []string) error {
 	if len(args) == 0 {
@@ -75,7 +75,7 @@ func classify(cfg Config, args []string) error {
 		return nil
 	}
 	if len(args) != 3 {
-		return fmt.Errorf("usage: lacheisis classify <app|title> <pattern> <category>")
+		return fmt.Errorf("usage: lachesis classify <app|title> <pattern> <category>")
 	}
 	match, pattern, cat := args[0], args[1], Category(args[2])
 	if match != "app" && match != "title" {

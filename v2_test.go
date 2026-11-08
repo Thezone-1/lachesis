@@ -30,9 +30,9 @@ func TestRulePrecedence(t *testing.T) {
 		want       Category
 	}{
 		{"chrome", "cat videos - YouTube", Distracting}, // title beats app
-		{"chrome", "lacheisis - GitHub", Productive},
+		{"chrome", "lachesis - GitHub", Productive},
 		{"chrome", "weather forecast", Neutral}, // unmatched
-		{"code", "main.go - lacheisis", Productive},
+		{"code", "main.go - lachesis", Productive},
 		{"code", "watching YouTube in an editor tab", Distracting}, // title pass runs first
 	}
 	for _, c := range cases {
@@ -91,7 +91,7 @@ func TestEntropy(t *testing.T) {
 	rules := defaultRules()
 	loop := sessionize(gen(t0, "code", 400, fixed("same task")), 5, rules)
 	varied := sessionize(gen(t0, "code", 400, func(i int) string {
-		return fmt.Sprintf("file%d.go - lacheisis", i/20)
+		return fmt.Sprintf("file%d.go - lachesis", i/20)
 	}), 5, rules)
 	if e := loop.Blocks[0].Entropy(); e >= lowEntropyThreshold {
 		t.Errorf("looping block entropy %.3f should be below %.2f", e, lowEntropyThreshold)
@@ -110,10 +110,10 @@ func TestCommitAttribution(t *testing.T) {
 	}
 	end := m.Blocks[0].End
 	commits := []Commit{
-		{Hash: "a", TS: t0.Add(10 * time.Minute)},   // inside
-		{Hash: "b", TS: end.Add(10 * time.Minute)},  // within 30m after
-		{Hash: "c", TS: end.Add(40 * time.Minute)},  // too late — orphan
-		{Hash: "d", TS: t0.Add(-10 * time.Minute)},  // before — orphan
+		{Hash: "a", TS: t0.Add(10 * time.Minute)},  // inside
+		{Hash: "b", TS: end.Add(10 * time.Minute)}, // within 30m after
+		{Hash: "c", TS: end.Add(40 * time.Minute)}, // too late — orphan
+		{Hash: "d", TS: t0.Add(-10 * time.Minute)}, // before — orphan
 	}
 	orphans := attributeCommits(m.Blocks, commits)
 	if len(m.Blocks[0].Commits) != 2 {
@@ -140,8 +140,8 @@ func TestFarmerVsDeepWorker(t *testing.T) {
 	attributeCommits(fm.Blocks, nil)
 	farmerScore := computeScore(fm, w)
 
-	blockA := gen(t0, "code", 720, func(i int) string { return fmt.Sprintf("blocks.go:%d", i/10) }) // 1h
-	browse := gen(after(blockA), "chrome", 60, fixed("weather forecast"))                           // 5m neutral
+	blockA := gen(t0, "code", 720, func(i int) string { return fmt.Sprintf("blocks.go:%d", i/10) })            // 1h
+	browse := gen(after(blockA), "chrome", 60, fixed("weather forecast"))                                      // 5m neutral
 	blockB := gen(after(browse), "code", 540, func(i int) string { return fmt.Sprintf("report.go:%d", i/10) }) // 45m
 	pause := []Sample{{TS: after(blockB), Idle: true}}
 	blockC := gen(after(blockB).Add(10*time.Minute), "windowsterminal", 360, func(i int) string {

@@ -7,18 +7,18 @@ import (
 	"time"
 )
 
-const version = "0.2.0"
+var version = "0.3.0-dev"
 
-const usage = `lacheisis %s — measures each thread and decides how much is allotted
+const usage = `lachesis %s — measures each thread and decides how much is allotted
 
 Usage:
-  lacheisis track                    run the collector (foreground; use Start-Process to detach)
-  lacheisis report [YYYY-MM-DD]      day's score, focus blocks, yield and per-app thread (default: today)
-  lacheisis allot <app> <duration>   set a daily allotment, e.g. lacheisis allot chrome 2h
-  lacheisis allot                    list allotments
-  lacheisis classify <app|title> <pattern> <category>
+  lachesis track                    run the collector (foreground; use Start-Process to detach)
+  lachesis report [YYYY-MM-DD]      day's score, focus blocks, yield and per-app thread (default: today)
+  lachesis allot <app> <duration>   set a daily allotment, e.g. lachesis allot chrome 2h
+  lachesis allot                    list allotments
+  lachesis classify <app|title> <pattern> <category>
                                      add a rule (category: productive|neutral|distracting)
-  lacheisis classify                 list rules
+  lachesis classify                 list rules
 
 Data: %s
 `
@@ -28,6 +28,7 @@ func main() {
 		fmt.Printf(usage, version, baseDir())
 		return
 	}
+	migrateLegacyDir()
 	cfg := loadConfig()
 
 	var err error
@@ -45,7 +46,7 @@ func main() {
 	case "classify":
 		err = classify(cfg, os.Args[2:])
 	case "version", "--version":
-		fmt.Println("lacheisis", version)
+		fmt.Println("lachesis", version)
 	default:
 		fmt.Printf(usage, version, baseDir())
 		os.Exit(2)
@@ -58,7 +59,7 @@ func main() {
 
 // track samples the foreground window every poll interval until interrupted.
 func track(cfg Config) error {
-	fmt.Printf("lacheisis %s — spinning the thread (every %ds, idle after %ds)\n",
+	fmt.Printf("lachesis %s — spinning the thread (every %ds, idle after %ds)\n",
 		version, cfg.PollSeconds, cfg.IdleSeconds)
 	fmt.Println("data:", dataDir())
 
@@ -100,7 +101,7 @@ func allot(cfg Config, args []string) error {
 		return nil
 	}
 	if len(args) != 2 {
-		return fmt.Errorf("usage: lacheisis allot <app> <duration>")
+		return fmt.Errorf("usage: lachesis allot <app> <duration>")
 	}
 	app, durStr := args[0], args[1]
 	if _, err := time.ParseDuration(durStr); err != nil {
