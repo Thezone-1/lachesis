@@ -1,18 +1,21 @@
 # Lachesis
 
+**A focus tracker for developers that scores outcomes, not hours.**
+Start a session, work, stop it, get a recap. One binary, no account, nothing leaves your machine.
+
+[![ci](https://github.com/Thezone-1/lachesis/actions/workflows/ci.yml/badge.svg)](https://github.com/Thezone-1/lachesis/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/Thezone-1/lachesis)](https://github.com/Thezone-1/lachesis/releases)
+[![license](https://img.shields.io/github/license/Thezone-1/lachesis)](LICENSE)
+
 > Lachesis measures each thread and decides how much is allotted. Atropos cuts it.
 
-A local-first focus tracker for developers, with a tiny game in your terminal. A ball of yarn runs
-along a thread while you work, jumps your distractions, and gets snipped by Atropos when you
-go over an allotment. When a session ends you get a recap card.
+## What it does
 
-It scores your day by **yield** (outcomes per focused hour), not by how long a window stayed open.
-Time-in-app is easy to farm: leave an editor focused and look busy. Ratios and artifacts are not.
-
-- **One binary, no dependencies, no account, no network.** Everything stays on your machine.
-- **Scores outcomes.** Commits are linked to the focus block they came from.
-- **Resists gaming.** A block that loops one window title is flagged instead of rewarded.
-- **Light.** About 1% of one CPU core and 26 MB of memory (see [Resource use](#resource-use)).
+- **Scores yield, not time in app.** Leaving an editor open earns nothing. A deep-work block that ends in a commit does.
+- **Runs as sessions.** `lachesis start` when you sit down, `lachesis stop` when you are done. Nothing is recorded outside a session.
+- **A small game in your terminal.** A ball of yarn runs along a thread and jumps your distractions. Go over an allotment and Atropos drops her scissors.
+- **Light and private.** About 1% of one core and 26 MB. No network code. Data stays in files only you can read.
+- **Windows, macOS and Linux.** Linux is X11 only and experimental.
 
 ```
   L A C H E S I S                          HI 00074  00031
@@ -25,6 +28,9 @@ Time-in-app is easy to farm: leave an editor focused and look busy. Ratios and a
   today  3h42m active · 25m idle · focus block 1h20m
   score  ███████░░░ 74  a well-measured day
 ```
+
+Time in a window is easy to farm: leave it focused and look busy. Ratios and artifacts are harder to fake,
+so the score is built from focus, depth, cohesion and commit yield (see [How the score works](#how-the-score-works)).
 
 ## Quick start
 
@@ -184,7 +190,7 @@ Window titles can contain sensitive text (document names, tab titles).
 
 - Data is written only to local files that only you can read. There is **no network code**.
 - Delete the data folder at any time to erase everything.
-- It reads `git log` of the repos you list, nothing else about them.
+- It reads `git log` of the repos you list, nothing else about them. Only list repos you trust, because it runs `git` inside them.
 
 Data folder: `%LOCALAPPDATA%\lachesis` on Windows, `~/Library/Application Support/lachesis` on macOS,
 `$XDG_DATA_HOME/lachesis` (or `~/.local/share/lachesis`) on Linux. Inside: one `.jsonl` file per day,

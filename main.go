@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var version = "0.3.0-dev"
+var version = "0.3.0"
 
 const usage = `lachesis %s — measures each thread and decides how much is allotted
 
