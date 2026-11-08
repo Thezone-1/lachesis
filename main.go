@@ -18,6 +18,7 @@ Usage:
                                      run the collector with a live view (--plain: quiet output;
                                      --hide-titles: for screen recordings)
   lachesis report [YYYY-MM-DD]      day's score, focus blocks, yield and per-app thread (default: today)
+  lachesis demo                      play the story of the thread (no tracking, no permissions)
   lachesis allot <app> <duration>   set a daily allotment, e.g. lachesis allot chrome 2h
   lachesis allot                    list allotments
   lachesis classify <app|title> <pattern> <category>
@@ -45,6 +46,8 @@ func main() {
 			day = os.Args[2]
 		}
 		err = printReport(day, cfg)
+	case "demo":
+		err = demo(os.Args[2:])
 	case "allot":
 		err = allot(cfg, os.Args[2:])
 	case "classify":
@@ -112,24 +115,37 @@ func track(cfg Config, args []string) error {
 
 	state := live{}
 	pos, frame := 0, 0
+	cutAnim, cutApp := -1, ""
+	fired := map[string]bool{}
+	var lastErr string
+	var lastTS time.Time
 	sampleNow := func(now time.Time) {
 		if d := now.Format("2006-01-02"); d != today {
-			today, samples = d, nil // midnight: start a fresh day
+			today, samples, fired = d, nil, map[string]bool{} // midnight: start a fresh day
 		}
 		s := Sample{TS: now}
 		if IdleDuration() >= time.Duration(cfg.IdleSeconds)*time.Second {
 			s.Idle = true
 		} else if app, title, err := ActiveWindow(); err == nil {
 			s.App, s.Title = app, title
+			lastErr = ""
 		} else {
 			s.Idle = true // locked screen / secure desktop counts as away
+			if err != errLocked {
+				lastErr = "cannot read the front window (check your terminal's Automation/Accessibility permission)"
+			}
 		}
 		if err := appendSample(s); err != nil {
 			fmt.Fprintln(os.Stderr, "write:", err)
 		}
 		samples = append(samples, s)
+		lastTS = now
 		if animate {
 			state = buildLive(samples, s, cfg)
+			if state.cut != "" && !fired[state.cut] {
+				fired[state.cut] = true
+				cutAnim, cutApp = 0, state.cut
+			}
 		}
 	}
 	sampleNow(time.Now())
@@ -157,7 +173,16 @@ func track(cfg Config, args []string) error {
 			if threadStep(frame, state.cat, state.idle) {
 				pos++
 			}
-			view.draw(renderLive(state, frame, pos, opts))
+			if cutAnim >= 0 {
+				cutAnim++
+				if cutAnim >= cutFrames {
+					cutAnim = -1
+				}
+			}
+			shown := state
+			shown.cutting, shown.cutFrame, shown.cutApp = cutAnim >= 0, cutAnim, cutApp
+			shown.samples, shown.last, shown.now, shown.warn = len(samples), lastTS, time.Now(), lastErr
+			view.draw(renderLive(shown, frame, pos, opts))
 		}
 	}
 }

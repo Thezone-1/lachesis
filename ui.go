@@ -23,6 +23,14 @@ type live struct {
 	cut    string // app that blew its allotment, if any
 	idle   bool
 	block  time.Duration // length of the current focus block
+
+	cutting  bool // true while the scissors animation plays
+	cutFrame int
+	cutApp   string
+	samples  int
+	last     time.Time
+	now      time.Time
+	warn     string // set when the window cannot be read (e.g. a permission is missing)
 }
 
 // minScoreActive is how much activity a day needs before a score means anything.
@@ -134,12 +142,15 @@ func renderLive(l live, frame, pos int, o uiOpts) []string {
 	if o.width < 20 {
 		o.width = 20
 	}
-	h, v, tl, tr, bl, br := "─", "│", "╭", "╮", "╰", "╯"
-	if o.ascii {
-		h, v, tl, tr, bl, br = "-", "|", "+", "+", "+", "+"
+	tw := o.width - wheelW - figureW - 2
+	if tw < 18 {
+		tw = 18
 	}
-	edge := strings.Repeat(h, o.width+4)
-	thread := threadLine(o.width-1, pos, l.cat, l.idle, l.cut != "", o.ascii)
+	cf := -1
+	if l.cutting {
+		cf = l.cutFrame
+	}
+	sc := buildScene(tw, pos, l.cat, l.idle, cf, o.ascii)
 	tint := catColor(l.cat, l.idle)
 
 	app := l.sample.App
@@ -156,14 +167,29 @@ func renderLive(l live, frame, pos int, o uiOpts) []string {
 	}
 	now := trunc(strings.TrimSpace(fmt.Sprintf("%s %s", app, title)), o.width-14)
 
+	beat := "●"
+	if o.ascii {
+		beat = "*"
+	}
+	if frame%8 >= 5 {
+		beat = " "
+	}
+	ago := "-"
+	if !l.last.IsZero() && !l.now.IsZero() {
+		ago = fmt.Sprintf("%ds ago", int(l.now.Sub(l.last).Seconds()))
+	}
 	lines := []string{
-		"  " + paint(o, "1", "L A C H E S I S") + "  " + paint(o, "90", "version "+version),
-		"  " + tl + edge + tr,
-		"  " + v + " " + paint(o, tint, yarn(frame, o.ascii, l.idle)) + " " + paint(o, tint, thread) + " " + v,
-		"  " + bl + edge + br,
+		"  " + paint(o, "1", "L A C H E S I S") + "  " + paint(o, "90", "version "+version) + "   " +
+			paint(o, "32", beat+" tracking") + paint(o, "90", fmt.Sprintf(" · %d %s · last %s", l.samples, plural(l.samples, "sample", "samples"), ago)),
+		"  " + paint(o, "90", "Lachesis measures"+strings.Repeat(" ", max(1, wheelW+tw-17-2))+"Atropos cuts"),
+	}
+	for i := 0; i < sceneH; i++ {
+		lines = append(lines, "  "+paint(o, tint, sc.wheel[i])+paint(o, tint, sc.thread[i])+paint(o, "35", sc.figure[i]))
+	}
+	lines = append(lines,
 		fmt.Sprintf("  now    %s  %s", paint(o, tint, catTag(l.cat)+" "+state), now),
 		fmt.Sprintf("  today  %s active · %s idle · focus block %s", liveDur(l.m.Active), liveDur(l.m.Idle), liveDur(l.block)),
-	}
+	)
 	if l.m.Active < minScoreActive {
 		lines = append(lines,
 			fmt.Sprintf("  score  %s --  warming up the thread (needs %s of activity)", scoreBar(0, o.ascii), fmtDur(minScoreActive)),
@@ -173,11 +199,23 @@ func renderLive(l live, frame, pos int, o uiOpts) []string {
 			fmt.Sprintf("  score  %s %d  %s", paint(o, tint, scoreBar(l.score.Total, o.ascii)), l.score.Total, verdict(l.score.Total)),
 			fmt.Sprintf("         focus %.2f · depth %.2f · cohesion %.2f · yield %.2f", l.score.Focus, l.score.Depth, l.score.Cohesion, l.score.Yield))
 	}
-	if l.cut != "" {
+	switch {
+	case l.warn != "":
+		lines = append(lines, "  "+paint(o, "33", "! "+l.warn))
+	case l.cutting:
+		lines = append(lines, "  "+paint(o, "31", "✂ "+cutLabel(l.cutFrame, l.cutApp)))
+	case l.cut != "":
 		lines = append(lines, "  "+paint(o, "31", "✂ Atropos: "+l.cut+" is over its allotment"))
-	} else {
+	default:
 		lines = append(lines, "")
 	}
 	lines = append(lines, "  "+paint(o, "90", "Ctrl-C pauses the thread"))
 	return lines
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
 }

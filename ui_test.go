@@ -79,3 +79,29 @@ func TestHideTitlesAndWarmup(t *testing.T) {
 		t.Fatal("score should show once there is enough activity")
 	}
 }
+
+func TestCutAnimationStages(t *testing.T) {
+	const w = 40
+	walking := buildScene(w, 0, Productive, false, 5, false).thread[threadRow]
+	if !strings.ContainsRune(walking, '✂') {
+		t.Fatal("scissors should be on the thread while walking")
+	}
+	cut := buildScene(w, 0, Productive, false, 24, false)
+	if strings.Contains(cut.thread[threadRow][w/2+4:], "o") {
+		t.Fatal("thread right of the cut should be gone")
+	}
+	if !strings.Contains(strings.Join(cut.thread[:], ""), "~~~~~") {
+		t.Fatal("the severed tail should be drawn below the thread")
+	}
+	for f := 0; f < cutFrames; f++ {
+		s := buildScene(w, 3, Neutral, false, f, true)
+		for _, row := range s.thread {
+			if len([]rune(row)) != w {
+				t.Fatalf("frame %d: row width %d", f, len([]rune(row)))
+			}
+		}
+	}
+	if buildScene(w, 0, Productive, false, -1, false).thread[threadRow] != threadLine(w, 0, Productive, false, false, false) {
+		t.Fatal("no cut: thread must be untouched")
+	}
+}
